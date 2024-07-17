@@ -1,0 +1,60 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.28"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Semaphore_Examples_CPP",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "Semaphore_Examples_CPP::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Semaphore_Examples_CPP-Debug-fe0f0fa0f2fe5276ba2e.json",
+					"name" : "Semaphore_Examples_CPP",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/ozgur/GitHub/OS_Semaphore_Examples/Semaphore_Examples_CPP/cmake-build-debug",
+		"source" : "C:/Users/ozgur/GitHub/OS_Semaphore_Examples/Semaphore_Examples_CPP"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

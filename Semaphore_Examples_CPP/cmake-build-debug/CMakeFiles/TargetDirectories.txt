@@ -1,0 +1,3 @@
+C:/Users/ozgur/GitHub/OS_Semaphore_Examples/Semaphore_Examples_CPP/cmake-build-debug/CMakeFiles/Semaphore_Examples_CPP.dir
+C:/Users/ozgur/GitHub/OS_Semaphore_Examples/Semaphore_Examples_CPP/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/ozgur/GitHub/OS_Semaphore_Examples/Semaphore_Examples_CPP/cmake-build-debug/CMakeFiles/rebuild_cache.dir
