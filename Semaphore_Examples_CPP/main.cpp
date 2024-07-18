@@ -34,11 +34,22 @@ namespace synchronization_1_Serialization
         std::cout << "Me: Working" << std::endl;
         std::cout << "Me: Eating lunch" << std::endl;
 
-        //mtx.lock();
         std::cout << "Me: Calling Bob" << std::endl;
         isBobCalled = true;
-        //mtx.unlock();
 
+        /*
+         If we do not use cv.notify_one, the code may get stuck in some cases
+
+         Timing Variability: If Thread B starts execution after Thread A sets isBobCalled to true,
+         Thread B may not need to wait. It will check the condition and continue unimpeded.
+
+         CPU Timing: The operating system's thread scheduler may sometimes allow Thread A
+         to finish setting isBobCalled before Thread B reaches the wait call.
+
+         BUT IT IS NOT RELIABLE !!!
+         */
+
+        // This code piece sends signals to waiting threads.
         cv.notify_one();
     }
 
@@ -47,6 +58,7 @@ namespace synchronization_1_Serialization
         std::cout << "Bob: Eating breakfast" << std::endl;
 
         std::unique_lock<std::mutex> lock(mtx);
+
         cv.wait(lock, []{ return isBobCalled; });
 
         std::cout << "Bob: Received call from Me" << std::endl;
@@ -88,7 +100,7 @@ namespace synchronization_2_NonDeterminism
     }
 }
 
-namespace synchronization_3_SharedVariables
+namespace synchronization_3_ConcurrentWrites
 {
     /*
     Most of the time, most variables in most threads are local,
@@ -106,22 +118,13 @@ namespace synchronization_3_SharedVariables
 
     void threadA(int& x)
     {
-        // Out of Critical Section
-        mtx.lock();
-        // Critical Section
         x = 5;
-        mtx.unlock();
-        // Out of Critical Section
         std::cout << x << std::endl;
     }
 
-    void threadB(int& x) {
-        // Out of Critical Section
-        mtx.lock();
-        // Critical Section
+    void threadB(int& x)
+    {
         x = 7;
-        mtx.unlock();
-        // Out of Critical Section
     }
 
     int run()
@@ -164,9 +167,10 @@ namespace synchronization_4_ConcurrentUpdates
     {
         for (int i = 0; i < 100000; ++i)
         {
-            mtx.lock();
+            // If you uncomment mtx variable synchronization problem would be ended.
+            // mtx.lock();
             x = x + 1;
-            mtx.unlock();
+            // mtx.unlock();
         }
     }
 
@@ -278,7 +282,7 @@ namespace synchronizationPatterns_3_Rendezvous
         First of all, all semaphores are not available initially.
         We got that semaphores have a value of 0.
      */
-    void runThreadA()
+    void threadA()
     {
         std::cout << "statement a1" << std::endl;
         // semaphore value is increased. Now value is 1 and it means available.
@@ -289,7 +293,7 @@ namespace synchronizationPatterns_3_Rendezvous
         std::cout << "statement a2" << std::endl;
     }
 
-    void runThreadB()
+    void threadB()
     {
         std::cout << "statement b1" << std::endl;
         // semaphore value is increased. Now value is 1 and it means available.
@@ -302,8 +306,8 @@ namespace synchronizationPatterns_3_Rendezvous
 
     void run()
     {
-        std::thread tA(runThreadA);
-        std::thread tB(runThreadB);
+        std::thread tA(threadA);
+        std::thread tB(threadB);
 
         if (tA.joinable()) { tA.join(); }
         if (tB.joinable()) { tB.join(); }
@@ -421,7 +425,7 @@ namespace synchronizationPatterns_6_Multiplex
 
     void thread(int _no)
     {
-        multiplex.acquire();
+        // multiplex.acquire();
         std::cout << _no << ". threads running...\n";
     }
 
@@ -468,7 +472,7 @@ namespace synchronizationPatterns_7_Barrier_Deadlock
     int n = 5;
     int count = 0;
     std::counting_semaphore<1> binarySemaphore(1);
-    std::counting_semaphore<5> barrier(0);
+    std::counting_semaphore<1> barrier(0);
 
 
     void thread()
@@ -480,7 +484,7 @@ namespace synchronizationPatterns_7_Barrier_Deadlock
         // NOT WORKING
         if (count == n) { barrier.release();}
         // WORKING
-        // if (count == n) { barrier.release(n);}
+        //if (count == n) { barrier.release(n);}
 
         barrier.acquire();
     }
@@ -520,7 +524,7 @@ namespace synchronizationPatterns_7_BarrierSolution
         barrier.acquire();
         barrier.release();
 
-        std::cout << "thread is stopped!" << std::endl;
+        std::cout << "execute is stopped!" << std::endl;
     }
 
     void run()
@@ -555,7 +559,7 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
     std::counting_semaphore<1> barrier(0);
 
 
-    void thread()
+    void execute()
     {
         mutex.lock();
         count++;
@@ -569,16 +573,16 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
 
         mutex.unlock();
 
-        std::cout << "thread is stopped!" << std::endl;
+        std::cout << "execute is stopped!" << std::endl;
     }
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -641,11 +645,11 @@ int main()
 
     // synchronization_1_Serialization::run();
     // synchronization_2_NonDeterminism::run();
-    // synchronization_3_SharedVariables::run();
+    // synchronization_3_ConcurrentWrites::run();
     // synchronization_4_ConcurrentUpdates::run();
     // synchronizationPatterns_1_Signaling::run();
     // synchronizationPatterns_3_Rendezvous::run();
-    // synchronizationPatterns_4_Deadlock::run();
+    // synchronizationPatterns_4_Rendezvous_Deadlock::run();
     // synchronizationPatterns_5_Mutex::run();
     // synchronizationPatterns_6_Multiplex::run();
     // synchronizationPatterns_7_Barrier_Deadlock::run();
