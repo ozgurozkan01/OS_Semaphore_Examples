@@ -1,8 +1,6 @@
 #include <iostream>
 #include <mutex>
 #include <semaphore>
-#include <thread>
-#include <vector>
 #include <condition_variable>
 
 std::mutex mtx;
@@ -212,7 +210,7 @@ namespace semaphore_definition
 
 namespace synchronizationPatterns_1_Signaling
 {
-    std::counting_semaphore<1> binarySem(0); // A semaphore its max count 1, means just 1 thread can access.
+    std::binary_semaphore binarySem(0); // A semaphore its max count 1, means just 1 thread can access.
 
     /*
      In this implementation, the output should be the :
@@ -268,8 +266,8 @@ namespace synchronizationPatterns_3_Rendezvous
         As the names suggest, aArrived indicates whether Thread A has arrived at the rendezvous, and bArrived likewise.
      */
 
-    std::counting_semaphore<1> aArrived(0); // A semaphore its max count 1, means just 1 thread can access.
-    std::counting_semaphore<1> bArrived(0); // A semaphore its max count 1, means just 1 thread can access.
+    std::binary_semaphore aArrived(0); // A semaphore its max count 1, means just 1 thread can access.
+    std::binary_semaphore bArrived(0); // A semaphore its max count 1, means just 1 thread can access.
 
     /*
         REMINDING !!!
@@ -471,9 +469,8 @@ namespace synchronizationPatterns_7_Barrier_Deadlock
 
     int n = 5;
     int count = 0;
-    std::counting_semaphore<1> binarySemaphore(1);
-    std::counting_semaphore<1> barrier(0);
-
+    std::binary_semaphore binarySemaphore(1);
+    std::binary_semaphore barrier(0);
 
     void thread()
     {
@@ -510,7 +507,7 @@ namespace synchronizationPatterns_7_BarrierSolution
     int n = 5;
     int count = 0;
     std::mutex mutex;
-    std::counting_semaphore<1> barrier(0);
+    std::binary_semaphore barrier(0);
 
     // Alternative Solution
     void thread()
@@ -556,7 +553,7 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
     int n = 5;
     int count = 0;
     std::mutex mutex;
-    std::counting_semaphore<1> barrier(0);
+    std::binary_semaphore barrier(0);
 
 
     void execute()
@@ -594,10 +591,17 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
 
 namespace synchronizationPatterns_9_ReusableBarrier_Deadlock
 {
+    /*
+     Failure Scenario !!
+        First Iteration: In the first iteration, threads might reach the barrier, increment count, and correctly proceed through the semaphore.
+        Subsequent Iterations: In the next iteration, the state of the semaphore may not be reset correctly:
+            If a thread acquires the semaphore after the turnstile.acquire() call, but before all threads have reached the barrier in the next iteration, it will proceed incorrectly.
+            Other threads will be left waiting indefinitely because the semaphore count may not align with the required number of threads.
+    */
     int n = 5;
     int count = 0;
     std::mutex mutex;
-    std::counting_semaphore<1> turnstile(0);
+    std::binary_semaphore turnstile(0);
 
     void thread()
     {
@@ -633,6 +637,99 @@ namespace synchronizationPatterns_9_ReusableBarrier_Deadlock
     }
 }
 
+namespace synchronizationPatterns_10_ReusableBarrier_Deadlock_2
+{
+    int n = 5;
+    int count = 0;
+    std::mutex mutex;
+    std::binary_semaphore turnstile(0);
+
+    void thread()
+    {
+        mutex.lock();
+        count++;
+        if (count == n) { turnstile.release(); }
+        mutex.unlock();
+
+        turnstile.acquire();
+        turnstile.release();
+
+        mutex.lock();
+        count--;
+        if (count == 0) { turnstile.acquire(); }
+        mutex.unlock();
+
+    }
+
+    void run()
+    {
+        std::thread thread1(thread);
+        std::thread thread2(thread);
+        std::thread thread3(thread);
+        std::thread thread4(thread);
+        std::thread thread5(thread);
+
+        if (thread1.joinable()) { thread1.join(); }
+        if (thread2.joinable()) { thread2.join(); }
+        if (thread3.joinable()) { thread3.join(); }
+        if (thread4.joinable()) { thread4.join(); }
+        if (thread5.joinable()) { thread5.join(); }
+    }
+}
+
+namespace synchronizationPatterns_11_ReusableBarrierSolution
+{
+    int n = 5;
+    int count = 0;
+    std::mutex mutex;
+    std::binary_semaphore turnstile(0);
+    std::binary_semaphore turnstile2(1);
+
+    void thread()
+    {
+        mutex.lock();
+        count++;
+        if (count == n)
+        {
+            turnstile2.acquire();
+            turnstile.release();
+        }
+        mutex.unlock();
+
+        turnstile.acquire();
+        turnstile.release();
+
+        mutex.lock();
+        count--;
+        if (count == 0)
+        {
+            turnstile.acquire();
+            turnstile2.release();
+        }
+        mutex.unlock();
+
+        turnstile2.acquire();
+        turnstile2.release();
+    }
+
+    void run()
+    {
+        std::thread thread1(thread);
+        std::thread thread2(thread);
+        std::thread thread3(thread);
+        std::thread thread4(thread);
+        std::thread thread5(thread);
+
+        if (thread1.joinable()) { thread1.join(); }
+        if (thread2.joinable()) { thread2.join(); }
+        if (thread3.joinable()) { thread3.join(); }
+        if (thread4.joinable()) { thread4.join(); }
+        if (thread5.joinable()) { thread5.join(); }
+    }
+}
+
+namespace synchronizationPatterns_12_
+
 int main()
 {
     // SYNCHRONIZATION - means making two things happen at the same time
@@ -655,8 +752,9 @@ int main()
     // synchronizationPatterns_7_Barrier_Deadlock::run();
     // synchronizationPatterns_7_BarrierSolution::run();
     // synchronizationPatterns_8_Barrier_Deadlock_2::run();
-
-    synchronizationPatterns_9_ReusableBarrier_Deadlock::run();
+    // synchronizationPatterns_9_ReusableBarrier_Deadlock::run();
+    // synchronizationPatterns_10_ReusableBarrier_Deadlock_2::run();
+    // synchronizationPatterns_11_ReusableBarrierSolution::run();
 
     return 0;
 }
