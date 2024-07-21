@@ -2,6 +2,7 @@
 #include <mutex>
 #include <semaphore>
 #include <condition_variable>
+#include <barrier>
 
 std::mutex mtx;
 
@@ -191,7 +192,8 @@ namespace semaphore_definition
     // SEMAPHORES - is a data structure that is useful for solving a variety of synchronization problems.
 
     std::counting_semaphore<3> semaphore(0);       // A semaphore its max count 3, means 3 thread access at the same time.
-    std::counting_semaphore<1> binarySemaphore(0); // A semaphore its max count 1, means just 1 thread can access.
+    std::binary_semaphore binarySemaphore(0);      // A semaphore its max count 1, means just 1 thread can access.
+    std::counting_semaphore<1> binarySemaphore_alternative(0);      // A semaphore its max count 1, means just 1 thread can access.
 
     void semaphoreImplementation()
     {
@@ -327,22 +329,22 @@ namespace synchronizationPatterns_4_Rendezvous_Deadlock
         In this example both threads wait each other forever because of no signaling.
      */
 
-    std::counting_semaphore<1> aArrived(0);
-    std::counting_semaphore<1> bArrived(0);
+    std::binary_semaphore aArrived(0);
+    std::binary_semaphore bArrived(0);
 
     void runThreadA()
     {
         std::cout << "statement a1" << std::endl;
-        bArrived.acquire();
-        aArrived.release();
+        bArrived.acquire(); // Lock semaphore
+        aArrived.release(); // Release semaphore
         std::cout << "statement a2" << std::endl;
     }
 
     void runThreadB()
     {
         std::cout << "statement b1" << std::endl;
-        aArrived.acquire();
-        bArrived.release();
+        aArrived.acquire(); // Lock semaphore
+        bArrived.release(); // Release semaphore
         std::cout << "statement b2" << std::endl;
     }
 
@@ -383,6 +385,7 @@ namespace synchronizationPatterns_5_Mutex
     {
         for (int i = 0; i < 10000000; ++i)
         {
+            // In C++, alternative mutex implementation.
             std::lock_guard<std::mutex> guard(mtx);
             x = x + 1;
         }
@@ -394,8 +397,8 @@ namespace synchronizationPatterns_5_Mutex
         std::thread tA(increase);
         std::thread tB(increase);
 
-        tA.join();
-        tB.join();
+        if (tA.joinable())  tA.join();
+        if (tB.joinable())  tB.join();
 
         std::cout << "Result : " << x << std::endl;
 
@@ -421,7 +424,7 @@ namespace synchronizationPatterns_6_Multiplex
 
     std::counting_semaphore<4> multiplex(4);
 
-    void thread(int _no)
+    void execute(int _no)
     {
         // multiplex.acquire();
         std::cout << _no << ". threads running...\n";
@@ -429,11 +432,11 @@ namespace synchronizationPatterns_6_Multiplex
 
     void run()
     {
-        std::thread thread1(thread, 1);
-        std::thread thread2(thread, 2);
-        std::thread thread3(thread, 3);
-        std::thread thread4(thread, 4);
-        std::thread thread5(thread, 5);
+        std::thread thread1(execute, 1);
+        std::thread thread2(execute, 2);
+        std::thread thread3(execute, 3);
+        std::thread thread4(execute, 4);
+        std::thread thread5(execute, 5);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -446,7 +449,12 @@ namespace synchronizationPatterns_6_Multiplex
 namespace synchronizationPatterns_7_Barrier_Deadlock
 {
     /*
-        - DEFINITION !!
+        - BARRIER DEFINITION !!
+        A barrier is a synchronization mechanism that enforces a condition where a specified number of threads
+        must all reach a particular point of execution (the "barrier") before any of them are allowed to proceed beyond that point.
+        This ensures that all threads are synchronized at the barrier, making it useful for tasks that require collective agreement or coordination.
+
+        - PROGRAM DEFINITON !!
         Let's consider the Rendezvous problem again. In this problem, we could not use more than 2 threads.
         To provide the synchronization no thread should execute critical point until after all threads have executed rendezvous.
         TO provide this, we are gonna use barrier. Barrier is gonna be locked (0 or negative) until all thread arrives to the barrier.
@@ -469,30 +477,36 @@ namespace synchronizationPatterns_7_Barrier_Deadlock
 
     int n = 5;
     int count = 0;
-    std::binary_semaphore binarySemaphore(1);
+    std::mutex mutex;
     std::binary_semaphore barrier(0);
+    // std::barrier barrier_alternative(0);
 
-    void thread()
+    void execute()
     {
-        binarySemaphore.acquire();
+        mutex.lock();
         count++;
-        binarySemaphore.release();
+        mutex.unlock();
 
+        // BOOK IMPLEMENTATION
         // NOT WORKING
-        if (count == n) { barrier.release();}
-        // WORKING
+        if (count == n) { barrier.release();} // Increase the barrier value by 1
+        // WORKING - Alternative Solution
         //if (count == n) { barrier.release(n);}
 
         barrier.acquire();
+
+
+        // Alternative Barrier Implementation with CPP barrier lib.
+        //barrier_alternative.arrive_and_wait();
     }
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -508,29 +522,33 @@ namespace synchronizationPatterns_7_BarrierSolution
     int count = 0;
     std::mutex mutex;
     std::binary_semaphore barrier(0);
+    // std::barrier barrier_alternative(n);
 
-    // Alternative Solution
-    void thread()
+    void execute()
     {
-        mutex.lock();
+        mutex.lock(); // Decrease the mutex value by 1
         count++;
-        mutex.unlock();
+        mutex.unlock(); // Increase the mutex value by 1
 
+        // BOOK IMPLEMENTATION
         if (count == n) { barrier.release();}
 
-        barrier.acquire();
-        barrier.release();
+        barrier.acquire(); // Decrease the barrier value by 1
+        barrier.release(); // Increase the barrier value by 1
+
+        // Alternative implementation with CPP barrier lib
+        //barrier_alternative.arrive_and_wait();
 
         std::cout << "execute is stopped!" << std::endl;
     }
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -555,22 +573,19 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
     std::mutex mutex;
     std::binary_semaphore barrier(0);
 
-
     void execute()
     {
-        mutex.lock();
+        mutex.lock(); // Decrease the mutex value by 1
         count++;
 
-        if (count == n) { std::cout << "Released" << std::endl; barrier.release(); }
+        if (count == n) { barrier.release(); }
 
         barrier.acquire();
         // std::cout << "Acquired" << std::endl;
         barrier.release();
         // std::cout << "Released" << std::endl;
 
-        mutex.unlock();
-
-        std::cout << "execute is stopped!" << std::endl;
+        mutex.unlock(); // Increase the mutex value by 1
     }
 
     void run()
@@ -592,18 +607,21 @@ namespace synchronizationPatterns_8_Barrier_Deadlock_2
 namespace synchronizationPatterns_9_ReusableBarrier_Deadlock
 {
     /*
+     Code seems to work, but unfortunately there are logic errors inside that can cause a synchronization error.
+
      Failure Scenario !!
         First Iteration: In the first iteration, threads might reach the barrier, increment count, and correctly proceed through the semaphore.
         Subsequent Iterations: In the next iteration, the state of the semaphore may not be reset correctly:
             If a thread acquires the semaphore after the turnstile.acquire() call, but before all threads have reached the barrier in the next iteration, it will proceed incorrectly.
             Other threads will be left waiting indefinitely because the semaphore count may not align with the required number of threads.
     */
+
     int n = 5;
     int count = 0;
     std::mutex mutex;
     std::binary_semaphore turnstile(0);
 
-    void thread()
+    void execute()
     {
         mutex.lock();
         count++;
@@ -623,11 +641,11 @@ namespace synchronizationPatterns_9_ReusableBarrier_Deadlock
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -639,12 +657,20 @@ namespace synchronizationPatterns_9_ReusableBarrier_Deadlock
 
 namespace synchronizationPatterns_10_ReusableBarrier_Deadlock_2
 {
+    /*
+    This code seems to write corrcet but there is some kind of synch problems.
+
+    Potential Deadlock:
+    The second turnstile.acquire() could cause a deadlock because if the last thread to decrement count
+    is the same one that released the semaphore, no other thread will be able to release it again.
+    */
+
     int n = 5;
     int count = 0;
     std::mutex mutex;
     std::binary_semaphore turnstile(0);
 
-    void thread()
+    void execute()
     {
         mutex.lock();
         count++;
@@ -658,16 +684,15 @@ namespace synchronizationPatterns_10_ReusableBarrier_Deadlock_2
         count--;
         if (count == 0) { turnstile.acquire(); }
         mutex.unlock();
-
     }
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -679,46 +704,60 @@ namespace synchronizationPatterns_10_ReusableBarrier_Deadlock_2
 
 namespace synchronizationPatterns_11_ReusableBarrierSolution
 {
+    /*
+        To solve deadlock problem, we use 2 turnstile semaphore.
+
+        turnstile:
+        This semaphore is used to synchronize threads at the first barrier point.
+        It ensures that all threads wait until the last thread has reached the barrier before proceeding.
+        It is initialized to 0, meaning threads will block on turnstile.acquire() until it is released by the last thread.
+
+        turnstile2:
+        This semaphore is used to manage a second phase of synchronization, essentially acting as a signal for the second barrier point.
+        It is initialized to 1, so it starts in the "unlocked" state. This allows the first thread to proceed after all threads have passed the first barrier.
+        It ensures that once all threads have reached the first barrier and proceeded, they wait for all threads to reach the second barrier before continuing.
+     */
+
     int n = 5;
     int count = 0;
     std::mutex mutex;
     std::binary_semaphore turnstile(0);
     std::binary_semaphore turnstile2(1);
 
-    void thread()
+    void execute()
     {
-        mutex.lock();
+        mutex.lock(); // For synchronization
         count++;
         if (count == n)
         {
-            turnstile2.acquire();
-            turnstile.release();
+            turnstile2.acquire(); // Lock the turnstile2
+            turnstile.release(); // Unlock the tunrstile for first thread
         }
         mutex.unlock();
 
-        turnstile.acquire();
-        turnstile.release();
+        turnstile.acquire(); // Blocking for first thread
+        turnstile.release(); // When first thread released, then it releases the thread which comes after it.
 
-        mutex.lock();
+        mutex.lock(); // For synchronization
         count--;
         if (count == 0)
         {
-            turnstile.acquire();
-            turnstile2.release();
+            turnstile.acquire(); // Lock the turnstile
+            turnstile2.release(); // Unlock the tunrstile2 for first thread
         }
         mutex.unlock();
 
-        turnstile2.acquire();
-        turnstile2.release();
+        turnstile2.acquire(); // Blocking for first thread
+        turnstile2.release(); // When first thread released, then it releases the thread which comes after it.
     }
 
     void run()
     {
-        std::thread thread1(thread);
-        std::thread thread2(thread);
-        std::thread thread3(thread);
-        std::thread thread4(thread);
-        std::thread thread5(thread);
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
 
         if (thread1.joinable()) { thread1.join(); }
         if (thread2.joinable()) { thread2.join(); }
@@ -728,7 +767,80 @@ namespace synchronizationPatterns_11_ReusableBarrierSolution
     }
 }
 
-namespace synchronizationPatterns_12_
+namespace synchronizationPatterns_12_PreloadedTurnstile
+{
+    /*
+
+     - DEFINITION OF PRELOADED TURNSTILE !!
+     A preloaded turnstile is a turnstile synchronization component that is initialized with
+     a predefined number of signals before threads attempt to pass through it.
+     This preloading mechanism allows a specified number of threads to pass through the turnstile simultaneously,
+     reducing the overhead associated with sequential thread passage.
+
+     - LOGIC OF RUNNING !!
+     When the nth thread arrives, it preloads the first turnstile with one signal for each thread.
+     When the nth thread passes the turnstile, it “takes the last token” and leaves the turnstile locked again.
+     The same thing happens at the second turnstile, which is unlocked when the last thread goes through the mutex.
+
+     */
+
+    int n = 5;
+    int count = 0;
+    std::mutex mutex;
+    std::binary_semaphore turnstile(0);
+    std::binary_semaphore turnstile2(0);
+
+    void execute()
+    {
+        mutex.lock(); // For synchronization
+        count++;
+        if (count == n) { turnstile.release(n); /* Unlock the tunrstile for first thread */ }
+        mutex.unlock();
+
+        turnstile.acquire(); // Blocking for threads
+
+        mutex.lock(); // For synchronization
+        count--;
+        if (count == 0) { turnstile2.release(n); /* Unlock the tunrstile2 for first thread */ }
+        mutex.unlock();
+
+        turnstile2.acquire(); // Blocking for threads
+    }
+
+    void run()
+    {
+        std::thread thread1(execute);
+        std::thread thread2(execute);
+        std::thread thread3(execute);
+        std::thread thread4(execute);
+        std::thread thread5(execute);
+
+        if (thread1.joinable()) { thread1.join(); }
+        if (thread2.joinable()) { thread2.join(); }
+        if (thread3.joinable()) { thread3.join(); }
+        if (thread4.joinable()) { thread4.join(); }
+        if (thread5.joinable()) { thread5.join(); }
+    }
+}
+
+#include "Barrier.h"
+
+namespace synchronizationPatterns_13_BarrierObject
+{
+    void run()
+    {
+        Barrier barrier(3); // initiliaze a new barrier
+        barrier.wait();     // Waiting - Deadlock
+    }
+};
+
+namespace synchronizationPatterns_14_LeaderAndFollower
+{
+    void run()
+    {
+
+    }
+}
 
 int main()
 {
@@ -744,6 +856,7 @@ int main()
     // synchronization_2_NonDeterminism::run();
     // synchronization_3_ConcurrentWrites::run();
     // synchronization_4_ConcurrentUpdates::run();
+
     // synchronizationPatterns_1_Signaling::run();
     // synchronizationPatterns_3_Rendezvous::run();
     // synchronizationPatterns_4_Rendezvous_Deadlock::run();
@@ -755,6 +868,9 @@ int main()
     // synchronizationPatterns_9_ReusableBarrier_Deadlock::run();
     // synchronizationPatterns_10_ReusableBarrier_Deadlock_2::run();
     // synchronizationPatterns_11_ReusableBarrierSolution::run();
+    synchronizationPatterns_12_PreloadedTurnstile::run();
+    // synchronizationPatterns_13_BarrierObject::run();
+    // synchronizationPatterns_14_LeaderAndFollower::run();
 
     return 0;
 }
