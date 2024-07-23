@@ -35,6 +35,7 @@ namespace introduction
 
     Eeating breakfast concurrently but lunch sequentially
  */
+        std::mutex mtx;
 
         std::condition_variable cv;
         bool isBobCalled = false;

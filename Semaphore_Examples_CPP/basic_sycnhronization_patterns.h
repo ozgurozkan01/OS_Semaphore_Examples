@@ -8,6 +8,7 @@
 #include <semaphore>
 #include <barrier>
 #include <iostream>
+#include "Barrier.h"
 
 namespace basic_synchronization_patterns
 {
@@ -627,7 +628,6 @@ namespace basic_synchronization_patterns
 
     namespace barrier_object
     {
-        #include "Barrier.h"
 
         void run()
         {
