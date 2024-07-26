@@ -13,6 +13,8 @@
 #include <chrono>
 #include <random>
 
+#define WRITER_PRIORITY 1
+
 namespace classical_synchronization_problems
 {
     /*
@@ -201,6 +203,14 @@ namespace classical_synchronization_problems
          - ANALOGY !!
          Lightswitch, by analogy with the pattern where the first person into a room turns on the light (locks the mutex)
          and the last one out turns it off (unlocks the mutex).
+
+         - WARNING ( STARVING PROBLEM )!!
+         In this example, deadlock is not possible, but there is a related problem that is almost as bad: it is possible for a writer to starve.
+         If a writer arrives while there are readers in the critical section, it might wait in queue forever while readers come and go.
+         As long as a new reader arrives before the last of the current readers departs, there will always be at least one reader in the room.
+
+         - PAY ATTENTION !!
+         This situation is not a deadlock, because some threads are making progress, but it is not exactly desirable.
          */
 
         class Lightswitch
@@ -234,21 +244,54 @@ namespace classical_synchronization_problems
             std::mutex mutex;
         };
 
+        // Code Base
         Lightswitch readLightSwitch;
         std::mutex roomEmpty; // 1 if there are no threads (readers or writers) in the critical section, and 0 otherwise
+        // Starving Problem
+        std::mutex turnstile; // To solve starving, turnstile for readers and a mutex for writers.
+        // Writer-Priority
+        #if WRITER_PRIORITY
+        Lightswitch readSwitch;
+        Lightswitch writeSwitch;
+        std::mutex noReaders;
+        std::mutex noWriters;
+        #endif
 
         void writer_execute()
         {
+        #if WRITER_PRIORITY
+            writeSwitch.lock(noReaders);
+            noWriters.lock();
+                std::cout << "Writer-Priority : Writer in critical section" << std::endl;
+            noWriters.unlock();
+            writeSwitch.unlock(noReaders);
+        #else
+            turnstile.lock(); // To solve starving
+
             roomEmpty.lock();
                 std::cout << "Writer in critical section" << std::endl;
+            turnstile.unlock(); // To solve starving
+
             roomEmpty.unlock();
+        #endif
         }
 
         void reader_execute()
         {
+        #if WRITER_PRIORITY
+            noReaders.lock();
+            readSwitch.lock(noWriters);
+            noReaders.unlock();
+                std::cout << "Writer-Priority : Reader in critical section" << std::endl;
+            readSwitch.unlock(noWriters);
+        #else
+            turnstile.lock(); // To solve starving
+            turnstile.unlock(); // To solve starving
+
             readLightSwitch.lock(roomEmpty);
                 std::cout << "Reader in critical section" << std::endl;
             readLightSwitch.unlock(roomEmpty);
+        #endif
         }
 
         void run()
@@ -264,6 +307,11 @@ namespace classical_synchronization_problems
             if (reader1.joinable()) { reader1.join(); }
             if (reader2.joinable()) { reader2.join(); }
         }
+    }
+
+    namespace no_starving_mutex
+    {
+
     }
 }
 
