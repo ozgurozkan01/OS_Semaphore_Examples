@@ -194,6 +194,77 @@ namespace classical_synchronization_problems
             }
         }
     }
+
+    namespace readers_and_writers_problem
+    {
+        /*
+         - ANALOGY !!
+         Lightswitch, by analogy with the pattern where the first person into a room turns on the light (locks the mutex)
+         and the last one out turns it off (unlocks the mutex).
+         */
+
+        class Lightswitch
+        {
+        public:
+            Lightswitch() : counter(0) {}
+
+            void lock(std::mutex& _roomEmpty)
+            {
+                mutex.lock();
+                counter++;
+                if (counter == 1)
+                {
+                    _roomEmpty.lock();
+                }
+                mutex.unlock();
+            }
+
+            void unlock(std::mutex& _roomEmpty)
+            {
+                mutex.lock();
+                counter--;
+                if (counter == 0)
+                {
+                    _roomEmpty.unlock();
+                }
+                mutex.unlock();
+            }
+        private:
+            int counter; // keeps track of how many readers are in the room
+            std::mutex mutex;
+        };
+
+        Lightswitch readLightSwitch;
+        std::mutex roomEmpty; // 1 if there are no threads (readers or writers) in the critical section, and 0 otherwise
+
+        void writer_execute()
+        {
+            roomEmpty.lock();
+                std::cout << "Writer in critical section" << std::endl;
+            roomEmpty.unlock();
+        }
+
+        void reader_execute()
+        {
+            readLightSwitch.lock(roomEmpty);
+                std::cout << "Reader in critical section" << std::endl;
+            readLightSwitch.unlock(roomEmpty);
+        }
+
+        void run()
+        {
+            std::thread writer1(writer_execute);
+            std::thread reader1(reader_execute);
+
+            std::thread writer2(writer_execute);
+            std::thread reader2(reader_execute);
+
+            if (writer1.joinable()) { writer1.join(); }
+            if (writer2.joinable()) { writer2.join(); }
+            if (reader1.joinable()) { reader1.join(); }
+            if (reader2.joinable()) { reader2.join(); }
+        }
+    }
 }
 
 #endif //SEMAPHORE_EXAMPLES_CPP_CLASSICAL_SYNCHRONIZATION_PROBLEMS_H
