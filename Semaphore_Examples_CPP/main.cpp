@@ -37,7 +37,8 @@ int main()
     // producer_consumer_problem_finite::run();
     // readers_and_writers_problem::run();
     // readers_and_writers_problem::run();
-    no_starving_mutex::run();
+    // no_starving_mutex::run();
+    dining_philosophers::run();
 
     return 0;
 }

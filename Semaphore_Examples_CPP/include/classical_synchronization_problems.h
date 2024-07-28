@@ -382,6 +382,107 @@ namespace classical_synchronization_problems
             if (thread3.joinable()) { thread3.join(); }
         }
     }
+
+    namespace dining_philosophers
+    {
+        /*
+         - IT HAS JUST SOLUTION 1 -
+
+         - CONSTRAINTS !!
+            • Only one philosopher can hold a fork at a time.
+            • It must be impossible for a deadlock to occur.
+            • It must be impossible for a philosopher to starve waiting for a fork.
+            • It must be possible for more than one philosopher to eat at the same time.
+         */
+
+
+        struct fork
+        {
+            std::binary_semaphore sem;
+
+            fork() : sem(0) {}
+            explicit fork(int _value) : sem(_value) {}
+        };
+
+        constexpr int philosophersAmount = 5;
+        // TODO
+        // Create a list which named forks but this cannot be implemented
+        // Because semaphores are non-moveable. it's about the lack of a copy or move constructor.
+        // To solve this we can put it into a struct or a class.
+        std::array<fork, philosophersAmount> forks {fork(1), fork(1), fork(1), fork(1), fork(1)};
+        std::mutex footman; // to solve deadlock
+
+        int left(int _index) { return _index; } // Actually do not need it !
+        int right(int _index) { return (_index + 1) % 5; }
+
+/*
+        - THIS IS WRONG !!
+        This algorithm satisfy first rule but does not other two. The problem is that the table is round.
+        As a result, each philosopher can pick up a fork and then wait forever for the other fork. And that couses a deadlock.
+
+        void get_forks(int _index)
+        {
+            forks[right(_index)].sem.acquire();
+            forks[left(_index)].sem.acquire();
+        }
+
+        void put_forks(int _index)
+        {
+            forks[right(_index)].sem.release();
+            forks[left(_index)].sem.release();
+        }
+*/
+        void think() { std::cout << std::this_thread::get_id() << " is thinking..." << std::endl; }
+        void eat()   { std::cout << std::this_thread::get_id() << " is eating... yummy yummy..." << std::endl; }
+
+        // Correct solution
+        void get_forks(int _index)
+        {
+            footman.lock();
+            forks[right(_index)].sem.acquire();
+            forks[left(_index)].sem.acquire();
+            std::cout << std::this_thread::get_id() << " got fork..." << std::endl;
+        }
+
+        void put_forks(int _index)
+        {
+            forks[right(_index)].sem.release();
+            forks[left(_index)].sem.release();
+            footman.unlock();
+            std::cout << std::this_thread::get_id() << " put fork..." << std::endl;
+        }
+
+        void execute(int _index)
+        {
+            while(true)
+            {
+                think();
+                get_forks(_index);
+                eat();
+                put_forks(_index);
+            }
+        }
+
+        void run()
+        {
+            std::vector<std::thread> threads;
+
+            for (int i = 0; i < philosophersAmount; ++i) {
+                threads.emplace_back(execute, i);
+            }
+
+            for (auto& thread : threads) {
+                if (thread.joinable()) {
+                    thread.join();
+                }
+            }
+        }
+    }
+
+    namespace tanenboums_solution
+    {
+
+    }
 }
 
 #endif //SEMAPHORE_EXAMPLES_CPP_CLASSICAL_SYNCHRONIZATION_PROBLEMS_H
