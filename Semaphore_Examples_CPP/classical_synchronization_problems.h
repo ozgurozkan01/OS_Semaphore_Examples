@@ -20,7 +20,6 @@ namespace classical_synchronization_problems
     /*
         - What is the PRODUCER-CONSUMER Problem !!
 
-
         - WARNING !!
         This example to long, because of that, in this example, there is more than one example implementation.
         Pay attention to the comment sectins.
@@ -211,6 +210,9 @@ namespace classical_synchronization_problems
 
          - PAY ATTENTION !!
          This situation is not a deadlock, because some threads are making progress, but it is not exactly desirable.
+
+         - WRITER-PRIORITY SOLUTION !!
+
          */
 
         class Lightswitch
@@ -311,7 +313,74 @@ namespace classical_synchronization_problems
 
     namespace no_starving_mutex
     {
+        /*
+         - WHY MORRIS'S ALGORITHM IS USED !!
+            Starvation can occur when one or more threads are perpetually denied
+            access to a resource because other threads continually consume the resource.
 
+            Morris’s algorithm helps prevent starvation by ensuring that all threads will eventually gain
+            access to the critical section, even if there are more threads trying to enter concurrently
+
+          - WHY THERE ARE 2 PHASES !!
+            Phase 1 ensures that threads are managed fairly before they enter the critical section.
+            By using t1 and t2, the algorithm controls access to the critical section,
+            ensuring only one thread executes the critical section at a time.
+         */
+
+        std::mutex mutex;
+        // waiting threads amount
+        int room1 = 0;
+        int room2 = 0;
+        // provides to control the flow of threads
+        std::binary_semaphore t1(1); // available
+        std::binary_semaphore t2(0); // unavailable
+
+        void morris_algorithm()
+        {
+            while (true)
+            {
+                // phase 1
+                mutex.lock();
+                ++room1;
+                mutex.unlock();
+
+                t1.acquire();
+                    ++room2;
+                    mutex.lock();
+                    --room1;
+
+                    if (room1 == 0)
+                    {
+                        mutex.unlock();
+                        t2.release();
+                    }
+                    else
+                    {
+                        mutex.unlock();
+                        t1.release();
+                    }
+
+                // phase 2
+                t2.acquire();
+                    --room2;
+
+                    std::cout << "Thread with " << std::this_thread::get_id() << "ids in Critical Section! "  << std::endl;
+
+                    if (room2 == 0) { t1.release(); }
+                    else            { t2.release(); }
+            }
+        }
+
+        void run()
+        {
+            std::thread thread1(morris_algorithm);
+            std::thread thread2(morris_algorithm);
+            std::thread thread3(morris_algorithm);
+
+            if (thread1.joinable()) { thread1.join(); }
+            if (thread2.joinable()) { thread2.join(); }
+            if (thread3.joinable()) { thread3.join(); }
+        }
     }
 }
 
