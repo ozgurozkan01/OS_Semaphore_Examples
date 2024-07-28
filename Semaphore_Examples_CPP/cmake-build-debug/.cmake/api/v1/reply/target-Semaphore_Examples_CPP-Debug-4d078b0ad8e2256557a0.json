@@ -98,7 +98,10 @@
 			"name" : "Header Files",
 			"sourceIndexes" : 
 			[
-				2
+				2,
+				3,
+				4,
+				5
 			]
 		}
 	],
@@ -113,12 +116,27 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "Barrier.cpp",
+			"path" : "src/Barrier.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{
 			"backtrace" : 1,
-			"path" : "Barrier.h",
+			"path" : "include/Barrier.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "include/introduction.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "include/basic_sycnhronization_patterns.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "include/classical_synchronization_problems.h",
 			"sourceGroupIndex" : 1
 		}
 	],

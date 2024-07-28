@@ -2,7 +2,7 @@
 // Created by ozgur on 7/21/2024.
 //
 
-#include "Barrier.h"
+#include "../include/Barrier.h"
 
 Barrier::Barrier(int _n) :
         n(_n),

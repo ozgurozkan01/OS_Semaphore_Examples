@@ -1,6 +1,6 @@
-#include "introduction.h"
-#include "basic_sycnhronization_patterns.h"
-#include "classical_synchronization_problems.h"
+#include "include/introduction.h"
+#include "include/basic_sycnhronization_patterns.h"
+#include "include/classical_synchronization_problems.h"
 
 using namespace introduction;
 using namespace basic_synchronization_patterns;

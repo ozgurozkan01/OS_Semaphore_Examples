@@ -1,22 +1,4 @@
 # ninja log v5
-6	954	7431732833058421	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-955	1066	7431732834151071	Semaphore_Examples_CPP.exe	7e513c62489d8d4e
-21	152	7432713459401979	CMakeFiles/Semaphore_Examples_CPP.dir/Barrier.cpp.obj	2cd5613780ffc4a
-15	959	7432713467460991	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-959	1202	7432713469861297	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-24	1558	7432714076964045	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-1558	1707	7432714078430075	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-17	934	7432715802699843	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-934	1060	7432715803924531	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-5	875	7432716071337773	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-876	998	7432716072527001	Semaphore_Examples_CPP.exe	dfabb8f59725628c
+6	1683	7438606707992448	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
+1684	1831	7438606709442780	Semaphore_Examples_CPP.exe	dfabb8f59725628c
 12	259	7432729807919845	CMakeFiles/Semaphore_Examples_CPP.dir/Barrier.cpp.obj	2cd5613780ffc4a
-7	843	7432729813755888	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-4	812	7432729998936448	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-813	921	7432729999998180	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-6	961	7432812508953322	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-961	1082	7432812510122582	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-7	839	7432818313274791	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-840	948	7432818314332691	Semaphore_Examples_CPP.exe	dfabb8f59725628c
-16	857	7432819445724837	CMakeFiles/Semaphore_Examples_CPP.dir/main.cpp.obj	17fdcde92a69d3e7
-858	965	7432819446781529	Semaphore_Examples_CPP.exe	dfabb8f59725628c
