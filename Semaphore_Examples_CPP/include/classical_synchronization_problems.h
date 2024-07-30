@@ -9,8 +9,6 @@
 #include <utility>
 #include <vector>
 #include <iostream>
-#include <condition_variable>
-#include <chrono>
 #include <random>
 
 #define WRITER_PRIORITY 1
@@ -385,6 +383,8 @@ namespace classical_synchronization_problems
 
     namespace dining_philosophers
     {
+        #define IS_TANENBAUMS 1
+
         /*
          - IT HAS JUST SOLUTION 1 -
 
@@ -405,16 +405,61 @@ namespace classical_synchronization_problems
         };
 
         constexpr int philosophersAmount = 5;
+
         // TODO
         // Create a list which named forks but this cannot be implemented
         // Because semaphores are non-moveable. it's about the lack of a copy or move constructor.
         // To solve this we can put it into a struct or a class.
         std::array<fork, philosophersAmount> forks {fork(1), fork(1), fork(1), fork(1), fork(1)};
-        std::mutex footman; // to solve deadlock
+        std::counting_semaphore<4> footman(4); // to solve deadlock
 
         int left(int _index) { return _index; } // Actually do not need it !
         int right(int _index) { return (_index + 1) % 5; }
 
+        namespace tanenbaums
+        {
+            /*
+             In this solution while Tanenbaum’s solution effectively avoids deadlock, it does not fully address starvation.
+             Further enhancements are required to ensure that no philosopher is left waiting indefinitely.
+             */
+
+            enum class EState : uint8_t
+            {
+                thinking,
+                hungry,
+                eating
+            };
+
+            std::array<EState, philosophersAmount> states = { EState::thinking, EState::thinking, EState::thinking, EState::thinking, EState::thinking};
+            std::array<fork, philosophersAmount> tanenbaums_forks {fork(0), fork(0), fork(0), fork(0), fork(0)};
+            std::mutex mutex;
+
+            void test(int _index)
+            {
+                if (states[_index] == EState::hungry && states[left(_index)] != EState::eating && states[right(_index)] != EState::eating)
+                {
+                    states[_index] = EState::eating;
+                    tanenbaums_forks[_index].sem.release();
+                }
+            }
+
+            void put_forks(int _index)
+            {
+                mutex.lock();
+                states[_index] = EState::thinking;
+                test(right(_index));
+                test(left(_index));
+                mutex.unlock();
+            }
+            void get_forks(int _index)
+            {
+                mutex.lock();
+                states[_index] = EState::hungry;
+                test(_index);
+                mutex.unlock();
+                tanenbaums_forks[_index].sem.acquire();
+            }
+        }
 /*
         - THIS IS WRONG !!
         This algorithm satisfy first rule but does not other two. The problem is that the table is round.
@@ -432,24 +477,33 @@ namespace classical_synchronization_problems
             forks[left(_index)].sem.release();
         }
 */
+
         void think() { std::cout << std::this_thread::get_id() << " is thinking..." << std::endl; }
         void eat()   { std::cout << std::this_thread::get_id() << " is eating... yummy yummy..." << std::endl; }
 
         // Correct solution
         void get_forks(int _index)
         {
+            #if !IS_TANENBAUMS
             footman.lock();
             forks[right(_index)].sem.acquire();
             forks[left(_index)].sem.acquire();
             std::cout << std::this_thread::get_id() << " got fork..." << std::endl;
+            #else
+            tanenbaums::get_forks(_index);
+            #endif
         }
 
         void put_forks(int _index)
         {
+            #if !IS_TANENBAUMS
             forks[right(_index)].sem.release();
             forks[left(_index)].sem.release();
             footman.unlock();
             std::cout << std::this_thread::get_id() << " put fork..." << std::endl;
+            #else
+            tanenbaums::put_forks(_index);
+            #endif
         }
 
         void execute(int _index)
@@ -467,21 +521,18 @@ namespace classical_synchronization_problems
         {
             std::vector<std::thread> threads;
 
-            for (int i = 0; i < philosophersAmount; ++i) {
+            for (int i = 0; i < philosophersAmount; ++i)
+            {
                 threads.emplace_back(execute, i);
             }
 
-            for (auto& thread : threads) {
+            for (auto& thread : threads)
+            {
                 if (thread.joinable()) {
                     thread.join();
                 }
             }
         }
-    }
-
-    namespace tanenboums_solution
-    {
-
     }
 }
 
