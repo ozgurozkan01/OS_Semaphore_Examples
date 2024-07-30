@@ -383,7 +383,7 @@ namespace classical_synchronization_problems
 
     namespace dining_philosophers
     {
-        #define IS_TANENBAUMS 1
+        #define IS_TANENBAUMS 0
 
         /*
          - IT HAS JUST SOLUTION 1 -
@@ -415,6 +415,8 @@ namespace classical_synchronization_problems
 
         int left(int _index) { return _index; } // Actually do not need it !
         int right(int _index) { return (_index + 1) % 5; }
+
+#if IS_TANENBAUMS // If you want to use tanenbaums solution, activate the pre-processor variable !!
 
         namespace tanenbaums
         {
@@ -460,23 +462,9 @@ namespace classical_synchronization_problems
                 tanenbaums_forks[_index].sem.acquire();
             }
         }
-/*
-        - THIS IS WRONG !!
-        This algorithm satisfy first rule but does not other two. The problem is that the table is round.
-        As a result, each philosopher can pick up a fork and then wait forever for the other fork. And that couses a deadlock.
+#endif
 
-        void get_forks(int _index)
-        {
-            forks[right(_index)].sem.acquire();
-            forks[left(_index)].sem.acquire();
-        }
 
-        void put_forks(int _index)
-        {
-            forks[right(_index)].sem.release();
-            forks[left(_index)].sem.release();
-        }
-*/
 
         void think() { std::cout << std::this_thread::get_id() << " is thinking..." << std::endl; }
         void eat()   { std::cout << std::this_thread::get_id() << " is eating... yummy yummy..." << std::endl; }
@@ -485,7 +473,7 @@ namespace classical_synchronization_problems
         void get_forks(int _index)
         {
             #if !IS_TANENBAUMS
-            footman.lock();
+            footman.acquire();
             forks[right(_index)].sem.acquire();
             forks[left(_index)].sem.acquire();
             std::cout << std::this_thread::get_id() << " got fork..." << std::endl;
@@ -499,7 +487,7 @@ namespace classical_synchronization_problems
             #if !IS_TANENBAUMS
             forks[right(_index)].sem.release();
             forks[left(_index)].sem.release();
-            footman.unlock();
+            footman.release();
             std::cout << std::this_thread::get_id() << " put fork..." << std::endl;
             #else
             tanenbaums::put_forks(_index);
