@@ -21,20 +21,26 @@ namespace introduction
     namespace serialization
     {
         /*
-    Serialization : Event A must happen before Event B
+        Serialization : Event A must happen before Event B
 
-    Thread A (You)          Thread B (Bob)
-    1 Eat breakfast         1 Eat breakfast
-    2 Work                  2 Wait for a call
-    3 Eat lunch             3 Eat lunchS
-    4 Call Bob
+        Thread A (You)          Thread B (Bob)
+        1 Eat breakfast         1 Eat breakfast
+        2 Work                  2 Wait for a call
+        3 Eat lunch             3 Eat lunchS
+        4 Call Bob
 
-    !!!!!
-    It doesn't matter when Thread B has breakfast.
-    He can do it before A or after. But he must always have lunch after A.
+        !!!!!
+        It doesn't matter when Thread B has breakfast.
+        He can do it before A or after. But he must always have lunch after A.
 
-    Eeating breakfast concurrently but lunch sequentially
- */
+        Eeating breakfast concurrently but lunch sequentially
+
+        - CODE OUTPUT !!
+        This code will run thread independent until bob calls himself, and thread dependent for bob to have lunch.
+        The output here is that Calling Bob, Received call from bob, eating lunch will happen in order.
+        Otherwise the code output is incorrect.
+
+         */
         std::mutex mtx;
 
         std::condition_variable cv;
@@ -97,7 +103,13 @@ namespace introduction
 
         Thread A            Thread B
         print " yes "       print " no "
-     */
+
+         - CODE OUTPUT !!
+         The order in which messages are printed depends on the running order of the threads
+         because threads run in parallel with each other and there is no specific order.
+         The operating system determines this order. Therefore, the order of the “YES!” and “NO!” messages may be different in each run.
+
+         */
 
         void threadA() { std::cout << "YES!\n" << std::endl; }
         void threadB() { std::cout << "NO!\n" << std::endl; }
@@ -115,18 +127,18 @@ namespace introduction
     namespace concurrent_writes
     {
         /*
-   Most of the time, most variables in most threads are local,
-   meaning that they belong to a single thread and no other threads can access them.
-   As long as that’s true, there tend to be few synchronization problems,
-   because threads just don’t interact
+        Most of the time, most variables in most threads are local,
+        meaning that they belong to a single thread and no other threads can access them.
+        As long as that’s true, there tend to be few synchronization problems,
+        because threads just don’t interact
 
-    But usually some variables are shared among two or more threads; this is one of the ways threads interact with each other.
-    For example, one way to communicate information between threads is for one thread to read a value written by another thread
+         But usually some variables are shared among two or more threads; this is one of the ways threads interact with each other.
+         For example, one way to communicate information between threads is for one thread to read a value written by another thread
 
-    Thread A           Thread B
-    x = 5              x = 7
-    print x
-    */
+         Thread A           Thread B
+         x = 5              x = 7
+         print x
+        */
 
         void threadA(int& x)
         {
@@ -155,29 +167,36 @@ namespace introduction
     namespace concurrent_updates
     {
         /*
-    At first glance, it is not obvious that there is a synchronization problem here.
-    There are only two execution paths, and they yield the same result.
-    The problem is that these operations are translated into machine language before execution,
-    and in machine language the update takes two steps, a read and a write.
 
-    Signaling makes it possible to guarantee that a section of code in one thread
-    will run before a section of code in another thread; in other words, it solves the
-    serialization problem.
+        At first glance, it is not obvious that there is a synchronization problem here.
+        There are only two execution paths, and they yield the same result.
+        The problem is that these operations are translated into machine language before execution,
+        and in machine language the update takes two steps, a read and a write.
 
-    Thread A               Thread B
-    count = count + 1      1 count = count + 1
+        Signaling makes it possible to guarantee that a section of code in one thread
+        will run before a section of code in another thread; in other words, it solves the
+        serialization problem.
 
-    So the problem is that here each thread is reading the same value. Because of that,
-    the value is not going increased 1 instead of 2.
+        Thread A               Thread B
+        count = count + 1      1 count = count + 1
 
-    !! Note : small values does not show this synchronization problem. Because of that, I use loop to use bigger values.
-    */
+        So the problem is that here each thread is reading the same value. Because of that,
+        the value is not going increased 1 instead of 2.
+
+        !! Note : small values does not show this synchronization problem. Because of that, I use bigger values.
+
+         - CODE OUTPUT !!
+         There is no order in which threads access x. Therefore, threads can read or write x at the same time.
+         Due to this synchronization problem, the output may not be exactly equal to 2 x the amount of cycles.
+         Therefore the output may be less than 2 x 100,000. e.g. 123.456
+
+         */
 
         int x = 0;
 
         void increase()
         {
-            for (int i = 0; i < 100000; ++i)
+            for (int i = 0; i < 100'000; ++i)
             {
                 // If you uncomment mtx variable synchronization problem would be ended.
                 // mtx.lock();
