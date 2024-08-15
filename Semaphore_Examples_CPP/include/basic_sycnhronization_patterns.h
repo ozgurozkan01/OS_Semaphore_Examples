@@ -55,19 +55,20 @@ namespace basic_synchronization_patterns
     namespace rendezvous
     {
         /*
-    Thread A            Thread B
-    1 statement a1      1 statement b1
-    2 statement a2      2 statement b2
+        Thread A            Thread B
+        1 statement a1      1 statement b1
+        2 statement a2      2 statement b2
 
-    In this implementation both a1 and b1 will write as output before a2 and b2.
-    We have to guaratee that. And it does not matter whether a1 or b1 is written first.
+        - CODE OUTPUT !!
+        In this implementation both a1 and b1 will write as output before a2 and b2.
+        We have to guaratee that. And it does not matter whether a1 or b1 is written first.
 
-    !!! HINT IN BOOK TO IMPLEMENTATION
+        - HINT IN BOOK TO IMPLEMENTATION !!
 
-    The chances are good that you were able to figure out a solution, but if not, here is a hint.
-    Create two semaphores, named "aArrived" and "bArrived", and initialize them both to zero.
-    As the names suggest, aArrived indicates whether Thread A has arrived at the rendezvous, and bArrived likewise.
- */
+        The chances are good that you were able to figure out a solution, but if not, here is a hint.
+        Create two semaphores, named "aArrived" and "bArrived", and initialize them both to zero.
+        As the names suggest, aArrived indicates whether Thread A has arrived at the rendezvous, and bArrived likewise.
+        */
 
         std::binary_semaphore aArrived(0); // A semaphore its max count 1, means just 1 thread can access.
         std::binary_semaphore bArrived(0); // A semaphore its max count 1, means just 1 thread can access.
@@ -128,6 +129,11 @@ namespace basic_synchronization_patterns
         4 statement a2              4 statement b2
 
         In this example both threads wait each other forever because of no signaling.
+
+         - CODE OUTPUT !!
+         No fully output. Because of  no signaling. Both threads are writing the first statements but not writing the second one.
+         Becuase both threads call the acquire() first but not get in and call release() because of the semaphores initial value is 0
+         and that causes the deadlocks.
      */
 
         std::binary_semaphore aArrived(0);
@@ -178,6 +184,11 @@ namespace basic_synchronization_patterns
 
          Thread A                    Thread B
          1 count = count + 1         1 count = count + 1
+
+         - CODE OUTPUT !!
+        This code gives output as 20.000.000 thanks to mutex. Because mutex ensures that the threads reach the value x with a synchronization.
+        That means if a thread reaches the value, other threads wait until the mutex is available.
+         That prevents reading and writing this x value at the same time, ensuring that the output is correct.
       */
 
         std::mutex mtx;
@@ -185,7 +196,7 @@ namespace basic_synchronization_patterns
 
         void increase()
         {
-            for (int i = 0; i < 10000000; ++i)
+            for (int i = 0; i < 10'000'000; ++i)
             {
                 // In C++, alternative mutex implementation.
                 std::lock_guard<std::mutex> guard(mtx);
@@ -199,8 +210,8 @@ namespace basic_synchronization_patterns
             std::thread tA(increase);
             std::thread tB(increase);
 
-            if (tA.joinable())  tA.join();
-            if (tB.joinable())  tB.join();
+            if (tA.joinable()) { tA.join(); }
+            if (tB.joinable()) { tB.join(); }
 
             std::cout << "Result : " << x << std::endl;
 
@@ -211,6 +222,7 @@ namespace basic_synchronization_patterns
     namespace multiplex
     {
         /*
+
         MULTIPLEX : To allow multiple threads run in the critical section. To do that, we can use Semaphore which is value bigger than 1.
 
         In program, there are 5 threads but the semaphore has 4 as max value.
@@ -220,16 +232,19 @@ namespace basic_synchronization_patterns
         We could not release the threads to show when semaphore is full threads cannot get inside.
         But at the same time, we saw that multiple threads can run at the same time
 
-        !! To run the correct program, put any thread in the comment line.
+         - CODE OUTPUT !!
+         The output of this code is the “. thread is running...” output that 4 threads will print,
+         but the 5th thread cannot enter because there is no space in the multiplex and therefore cannot output.
 
-     */
+         !! To run the correct program, put any thread in the comment line.
+         */
 
         std::counting_semaphore<4> multiplex(4);
 
         void execute(int _no)
         {
-            // multiplex.acquire();
-            std::cout << _no << ". threads running...\n";
+            multiplex.acquire();
+            std::cout << _no << ". thread is running...\n";
         }
 
         void run()
@@ -270,17 +285,18 @@ namespace basic_synchronization_patterns
        WHY SOLUTION IS NOT CORRECT ?
        Specifically, all threads call barrier.acquire() after incrementing the count,
        but only the last thread (when count == n) calls barrier.release().
-       This causes the first n-1 thread to be blocked indefinitely in barrier.acquire() because barrier.release() is called only once.
+       This causes the first n-1 thread to be blocked indefinitely in barrier.acquire()
+       because barrier.release() is called only once or for one thread.
 
-       To solve this problem, we nned to make sure that all threads can continue after barrier.
+       To solve this problem, we need to make sure that all threads can continue after barrier.
        Solution I found is that when n == count, then barrier should be released for all threads.
 
     */
 
-        int n = 5;
+        const uint8_t n = 5;
         int count = 0;
         std::mutex mutex;
-        std::binary_semaphore barrier(0);
+        std::counting_semaphore<n> barrier(0);
         // std::barrier barrier_alternative(0);
 
         void execute()
@@ -291,12 +307,11 @@ namespace basic_synchronization_patterns
 
             // BOOK IMPLEMENTATION
             // NOT WORKING
-            if (count == n) { barrier.release();} // Increase the barrier value by 1
+            if (count == n) { barrier.release();} // Increase the barrier value by 1, we have 5 threads
             // WORKING - Alternative Solution
             //if (count == n) { barrier.release(n);}
 
             barrier.acquire();
-
 
             // Alternative Barrier Implementation with CPP barrier lib.
             //barrier_alternative.arrive_and_wait();
@@ -320,6 +335,19 @@ namespace basic_synchronization_patterns
 
     namespace barrier_solution
     {
+        /*
+         - CODE LOGIC !!
+         When n-1 thread reaches acquire(), none of them can enter, because the initial value of the barrier is already 0.
+         The nth thread releases the barrier and the value of the barrier increases by 1.
+         This increase allows the first thread that reaches acquire() to enter.
+         In the next line, the thread calls release(), increases the barrier by 1 and
+         the threads waiting at acquire() can enter respectively. Here, the value of the barrier is continuously decreasing and
+         increasing by 1 0 1 0 1 0 1 0 and the thread that enters allows the next thread to enter.
+
+         - CODE OUTPUT !!
+         Output is all threads write "Barrier reached to the end!" as output.
+         */
+
         int n = 5;
         int count = 0;
         std::mutex mutex;
@@ -341,7 +369,7 @@ namespace basic_synchronization_patterns
             // Alternative implementation with CPP barrier lib
             //barrier_alternative.arrive_and_wait();
 
-            std::cout << "execute is stopped!" << std::endl;
+            std::cout << "Barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -367,6 +395,9 @@ namespace basic_synchronization_patterns
         Becuase initial value of barrier is 0. So it is not acquirable. When thread1 arrived barrier.acquire(),
         it cannat pass through barrier. Because of that locked mutex never gonna be unlocked. And other threads
         never gonna get inside and wait forever.
+
+         - CODE OUTPUT !!
+         NO OUTPUT because of the deadlock.
      */
 
 
@@ -388,6 +419,8 @@ namespace basic_synchronization_patterns
             // std::cout << "Released" << std::endl;
 
             mutex.unlock(); // Increase the mutex value by 1
+
+            std::cout << "Barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -409,14 +442,19 @@ namespace basic_synchronization_patterns
     namespace reusable_barrier_deadlock
     {
         /*
-    Code seems to work, but unfortunately there are logic errors inside that can cause a synchronization error.
+        Code seems to work, but unfortunately there are logic errors inside that can cause a synchronization error.
 
-    Failure Scenario !!
-       First Iteration: In the first iteration, threads might reach the barrier, increment count, and correctly proceed through the semaphore.
-       Subsequent Iterations: In the next iteration, the state of the semaphore may not be reset correctly:
-           If a thread acquires the semaphore after the turnstile.acquire() call, but before all threads have reached the barrier in the next iteration, it will proceed incorrectly.
-           Other threads will be left waiting indefinitely because the semaphore count may not align with the required number of threads.
-   */
+        Failure Scenario !!
+           First Iteration: In the first iteration, threads might reach the barrier, increment count, and correctly proceed through the semaphore.
+           Subsequent Iterations: In the next iteration, the state of the semaphore may not be reset correctly:
+               If a thread acquires the semaphore after the turnstile.acquire() call, but before all threads have reached the barrier in the next iteration, it will proceed incorrectly.
+               Other threads will be left waiting indefinitely because the semaphore count may not align with the required number of threads.
+
+
+         - CODE OUTPUT !!
+         The code can give output and this output is “Reusable barrier reached to the end!” as many as the number of threads.
+         However, due to a logic error in the code, the code may enter deadlock. In this case there is no output.
+        */
 
         int n = 5;
         int count = 0;
@@ -439,6 +477,8 @@ namespace basic_synchronization_patterns
             mutex.unlock();
 
             if (count == 0) { turnstile.acquire(); }
+
+            std::cout << "Reusable barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -460,12 +500,16 @@ namespace basic_synchronization_patterns
     namespace reusable_barrier_deadlock_2
     {
         /*
-     This code seems to write corrcet but there is some kind of synch problems.
+         This code seems to write corrcet but there is some kind of synch problems.
 
-     Potential Deadlock:
-     The second turnstile.acquire() could cause a deadlock because if the last thread to decrement count
-     is the same one that released the semaphore, no other thread will be able to release it again.
-     */
+         Potential Deadlock:
+         The second turnstile.acquire() could cause a deadlock because if the last thread to decrement count
+         is the same one that released the semaphore, no other thread will be able to release it again.
+
+         - CODE OUTPUT !!
+         The code can give output and this output is “Reusable barrier reached to the end!” as many as the number of threads.
+         However, due to a logic error in the code, the code may enter deadlock. In this case there is no output.
+         */
 
         int n = 5;
         int count = 0;
@@ -486,6 +530,8 @@ namespace basic_synchronization_patterns
             count--;
             if (count == 0) { turnstile.acquire(); }
             mutex.unlock();
+
+            std::cout << "Reusable barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -518,6 +564,9 @@ namespace basic_synchronization_patterns
          This semaphore is used to manage a second phase of synchronization, essentially acting as a signal for the second barrier point.
          It is initialized to 1, so it starts in the "unlocked" state. This allows the first thread to proceed after all threads have passed the first barrier.
          It ensures that once all threads have reached the first barrier and proceeded, they wait for all threads to reach the second barrier before continuing.
+
+         - CODE OUTPUT !!
+         The output is n pieces “Reusable barrier reached to the end!”.
       */
 
         int n = 5;
@@ -551,6 +600,8 @@ namespace basic_synchronization_patterns
 
             turnstile2.acquire(); // Blocking for first thread
             turnstile2.release(); // When first thread released, then it releases the thread which comes after it.
+
+            std::cout << "Reusable barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -573,18 +624,20 @@ namespace basic_synchronization_patterns
     {
         /*
 
-   - DEFINITION OF PRELOADED TURNSTILE !!
-   A preloaded turnstile is a turnstile synchronization component that is initialized with
-   a predefined number of signals before threads attempt to pass through it.
-   This preloading mechanism allows a specified number of threads to pass through the turnstile simultaneously,
-   reducing the overhead associated with sequential thread passage.
+       - DEFINITION OF PRELOADED TURNSTILE !!
+       A preloaded turnstile is a turnstile synchronization component that is initialized with
+       a predefined number of signals before threads attempt to pass through it.
+       This preloading mechanism allows a specified number of threads to pass through the turnstile simultaneously,
+       reducing the overhead associated with sequential thread passage.
 
-   - LOGIC OF RUNNING !!
-   When the nth thread arrives, it preloads the first turnstile with one signal for each thread.
-   When the nth thread passes the turnstile, it “takes the last token” and leaves the turnstile locked again.
-   The same thing happens at the second turnstile, which is unlocked when the last thread goes through the mutex.
+       - LOGIC OF RUNNING !!
+       When the nth thread arrives, it preloads the first turnstile with one signal for each thread.
+       When the nth thread passes the turnstile, it “takes the last token” and leaves the turnstile locked again.
+       The same thing happens at the second turnstile, which is unlocked when the last thread goes through the mutex.
 
-   */
+       - CODE OUTPUT !!
+         The output is n pieces “Preloaded barrier reached to the end!”.
+       */
 
         int n = 5;
         int count = 0;
@@ -607,6 +660,8 @@ namespace basic_synchronization_patterns
             mutex.unlock();
 
             turnstile2.acquire(); // Blocking for threads
+
+            std::cout << "Preloaded barrier reached to the end!" << std::endl;
         }
 
         void run()
@@ -628,20 +683,32 @@ namespace basic_synchronization_patterns
 
     namespace barrier_object
     {
-
         void run()
         {
             Barrier barrier(3); // initiliaze a new barrier
-            barrier.wait();     // Waiting - Deadlock
+            barrier.wait();     // Waiting till forever - Deadlock
         }
     }
 
     namespace leader_and_follower_queue
     {
         /*
-     - LOGIC OF RUNNING !!
-        Every follower and leader should dance in pairs. The code logic
-     */
+         - LOGIC OF RUNNING !!
+         This code enables multithreading using mutex and semaphores to provide synchronization and matching between leaders and followers.
+         The goal of the code is to coordinate the pairing and dancing of leaders and followers and to ensure that both sides move in a synchronized manner.
+
+         A leader checks if there are followers. If there are followers, the leader and follower match.
+         If there are no followers, it is added to the leaders queue and waits. A follower checks if there are leaders.
+         If there are leaders, the follower and leader match. If there is no leader, it is added to the followers queue and waits.
+
+         Both sides are made to dance and synchronize. rendezvous semaphore allows leaders and followers to dance in synchronization and come together collectively.
+
+         - CODE OUTPUT !!
+         The output of this code is follower, leader , follower , leader respectively. However, it does not matter who the follower and leader are.
+         The code guarantees that there is only one follower and one leader in the scene at the same time.
+         In the output you can see that the number of consecutive followers and leaders changes according to the thread speed, but each time the follower and leader are consecutive.
+
+         */
 
 
         int leaders = 0;
@@ -652,12 +719,12 @@ namespace basic_synchronization_patterns
         std::counting_semaphore<4> followerQueue(0);
         std::counting_semaphore<4> rendezvous(0);
 
-        void dance(std::string _dancer)
+        void dance(std::string _dancer, int _dancerCode)
         {
-            std::cout << _dancer << " is dancing..." << std::endl;
+            std::cout << _dancerCode << ". " << _dancer << " is dancing..." << std::endl;
         }
 
-        void leaderExecute()
+        void leaderExecute(int _leaderCode)
         {
             mutex.lock();
             if (followers > 0)
@@ -672,12 +739,12 @@ namespace basic_synchronization_patterns
                 leaderQueue.acquire();
             }
 
-            dance("leader");
+            dance("leader", _leaderCode);
             rendezvous.acquire();
             mutex.unlock();
         }
 
-        void followerExecute()
+        void followerExecute(int _followerCode)
         {
             mutex.lock();
             if (leaders > 0)
@@ -692,19 +759,19 @@ namespace basic_synchronization_patterns
                 followerQueue.acquire();
             }
 
-            dance("follower");
+            dance("follower", _followerCode);
             rendezvous.release();
         }
 
         void run()
         {
-            std::thread leader1(leaderExecute);
-            std::thread leader2(leaderExecute);
-            std::thread leader3(leaderExecute);
+            std::thread leader1(leaderExecute, 1);
+            std::thread leader2(leaderExecute, 2);
+            std::thread leader3(leaderExecute, 3);
 
-            std::thread follower1(followerExecute);
-            std::thread follower2(followerExecute);
-            std::thread follower3(followerExecute);
+            std::thread follower1(followerExecute, 1);
+            std::thread follower2(followerExecute, 2);
+            std::thread follower3(followerExecute, 3);
 
             if (leader1.joinable()) { leader1.join(); }
             if (leader2.joinable()) { leader2.join(); }
