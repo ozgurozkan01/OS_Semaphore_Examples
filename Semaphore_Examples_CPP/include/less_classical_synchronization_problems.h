@@ -497,6 +497,396 @@ namespace less_classical_synchronization_problems
             }
         }
     }
+
+    namespace the_santa_claus_problem
+    {
+        /*
+         - LOGIC OF RUNNING !!
+            Santa Claus sleeps in his shop at the North Pole and only wakes up on two occasions:
+
+            * If all nine reindeer return from their South Pacific vacation.
+            * If three elves are in trouble (in this case only Santa wakes up when three elves are in trouble).
+            * If three elves are waiting for Santa's help, he waits until the other elves have had their turn.
+
+            - When the ninth reindeer returns, Santa must prepare the sleigh and then all nine reindeer must make cattle.
+            - When the third elf arrives, Santa must help the elves and all three elves must get help.
+            - After the three elves have received help, the other elves can wait at the door of the shop.
+            - Santa must work in a loop to be able to help many groups of elves. There are exactly nine reindeer, but the number of elves can change.
+
+            - CODE OUTPUT !!
+                34 numbered elf will get help...
+                 numbered elf will get help...
+                6 numbered elf will get help...
+                7 numbered elf will get help...
+                9 numbered elf will get help...
+                5 numbered elf will get help...
+                10 numbered elf will get help...
+                11 numbered elf will get help...
+                Santa Claus preparing sleigh...
+                8 numbered elf will get help...
+                19 numbered reindeer getting hitched...
+                20 numbered reindeer getting hitched...
+                21 numbered reindeer getting hitched...
+                15 numbered reindeer getting hitched...
+                18 numbered reindeer getting hitched...
+                14 numbered reindeer getting hitched...
+                16 numbered reindeer getting hitched...
+                12 numbered elf will get help...
+                13 numbered reindeer getting hitched...
+                17 numbered reindeer getting hitched...
+        */
+
+        constexpr int elves_number = 10;
+        constexpr int reindeer_number = 9;
+
+        int elf_counter = 0; // elves
+        int reindeer_counter = 0; // reindeer
+        std::binary_semaphore santaSem(0); // check the elf and reindeer counter
+        std::counting_semaphore<reindeer_number> reindeerSem(0);
+        std::binary_semaphore elfTex(1);
+        std::mutex mutex;
+
+        void execute_santa()
+        {
+            while (true)
+            {
+                santaSem.acquire();
+                mutex.lock();
+
+                if (reindeer_counter == reindeer_number)
+                {
+                    std::cout << "Santa Claus preparing sleigh...\n"; // prepareSleigh();
+                    for (int i = 0; i < reindeer_number; ++i)
+                    {
+                        reindeerSem.release();
+                    }
+                    reindeer_counter = 0;
+                }
+                else if (elf_counter == 3)
+                {
+                    std::cout << "Santa Claus helping elves...\n"; // helpElves();
+                }
+                mutex.unlock();
+            }
+        }
+
+        void execute_reindeer()
+        {
+            while (true)
+            {
+                mutex.lock();
+                reindeer_counter++;
+                if (reindeer_counter == reindeer_number)
+                {
+                    santaSem.release();
+                }
+                mutex.unlock();
+
+                reindeerSem.acquire();
+                std::cout << std::this_thread::get_id() << " numbered reindeer getting hitched...\n"; // getHitched();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+            }
+        }
+
+        void execute_elf()
+        {
+            while (true)
+            {
+                elfTex.acquire();
+                mutex.lock();
+
+                elf_counter++;
+                if (elf_counter == 3)
+                {
+                    santaSem.release();
+                }
+                else
+                {
+                    elfTex.release();
+                }
+
+                mutex.unlock();
+
+                std::cout << std::this_thread::get_id() << " numbered elf will get help...\n"; // getHelp();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+                mutex.lock();
+
+                elf_counter--;
+                if (elf_counter == 0)
+                {
+                    elfTex.release();
+                }
+
+                mutex.unlock();
+            }
+        }
+
+        void run()
+        {
+            std::vector<std::thread> elves;
+            std::vector<std::thread> reindeers;
+            std::thread santa(execute_santa);
+
+            for (int i = 0; i < elves_number; ++i)
+            {
+                elves.push_back(std::thread(execute_elf));
+            }
+
+            for (int i = 0; i < reindeer_number; ++i)
+            {
+                reindeers.push_back(std::thread(execute_reindeer));
+            }
+
+            if (santa.joinable())
+            {
+                santa.join();
+            }
+
+            for (auto& elf : elves)
+            {
+                if (elf.joinable())
+                {
+                    elf.join();
+                }
+            }
+
+            for (auto& reinder : reindeers)
+            {
+                if (reinder.joinable())
+                {
+                    reinder.join();
+                }
+            }
+        }
+    }
+
+    #include "Barrier.h" // Custom barrier implementation
+
+    namespace building_H2O
+    {
+        /*
+
+         - LOGIC OF RUNNING !!
+            There are two kinds of threads, oxygen and hydrogen. In order to assemble
+            these threads into water molecules, we have to create a barrier that makes each
+            thread wait until a complete molecule is ready to proceed.
+            As each thread passes the barrier, it should invoke bond. You must guarantee
+            that all the threads from one molecule invoke bond before any of the threads
+            from the next molecule do.
+
+            • If an oxygen thread arrives at the barrier when no hydrogen threads are
+            present, it has to wait for two hydrogen threads.
+            • If a hydrogen thread arrives at the barrier when no other threads are
+            present, it has to wait for an oxygen thread and another hydrogen thread.
+
+         - CODE OUTPUT !!
+
+         */
+        std::mutex mutex; // mutex for protecting shared variables
+        int oxygen_counter = 0; // count of waiting oxygen threads
+        int hydrogen_counter = 0; // count of waiting hydrogen threads
+        std::barrier<> barrier(3); // barrier to synchronize after bonding
+        std::binary_semaphore oxygen_fifo(0); // semaphore for oxygen threads
+        std::binary_semaphore hydrogen_fifo(0); // semaphore for hydrogen threads
+
+        void execute_oxygen()
+        {
+            mutex.lock();
+            oxygen_counter++;
+            if (hydrogen_counter >= 2)
+            {
+                hydrogen_fifo.release(2);
+                hydrogen_counter -= 2;
+                oxygen_fifo.release();
+                oxygen_counter--;
+            }
+            else
+            {
+                mutex.unlock();
+            }
+
+            oxygen_fifo.acquire(); // wait until allowed to bond
+            std::cout << "2 atoms bound each other!" << std::endl;
+            barrier.arrive_and_wait(); // wait for other threads to finish bonding
+
+            mutex.unlock(); // release the mutex after bonding
+        }
+
+        void execute_hydrogen()
+        {
+            mutex.lock();
+            hydrogen_counter++;
+            if (hydrogen_counter >= 2 && oxygen_counter >= 1)
+            {
+                hydrogen_fifo.release(2);
+                hydrogen_counter -= 2;
+                oxygen_fifo.release();
+                oxygen_counter--;
+            }
+            else
+            {
+                mutex.unlock(); // release mutex if no bonding can be done
+            }
+
+            hydrogen_fifo.acquire(); // wait until allowed to bond
+            std::cout << "2 atoms bound each other!" << std::endl;
+            barrier.arrive_and_wait(); // wait for other threads to finish bonding
+        }
+        void run()
+        {
+            std::vector<std::thread> threads;
+
+            for (int i = 0; i < 10; ++i)
+            {
+                threads.push_back(std::thread(execute_hydrogen));
+            }
+
+            for (int i = 0; i < 5; ++i)
+            {
+                threads.push_back(std::thread(execute_oxygen));
+            }
+
+            for (auto& thread : threads)
+            {
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            }
+        }
+    }
+
+    namespace river_crossing_problem
+    {
+        /*
+        - LOGIC OF RUNNING !!
+
+        - CODE OUTPUT !!
+
+         */
+        constexpr int single_number = 4;
+        constexpr int pair_number = 2;
+
+        Barrier barrier(4);
+        std::mutex mutex;
+        int hacker_counter = 0;
+        int serf_counter = 0;
+        std::counting_semaphore<> hackers_fifo(0);
+        std::counting_semaphore<> serfs_fifo(0);
+
+        void execute_hacker()
+        {
+            bool isCaptain = false;
+            mutex.lock();
+
+            hacker_counter++;
+            if (hacker_counter == single_number)
+            {
+                hackers_fifo.release(single_number);
+                hacker_counter -= single_number;
+                isCaptain = true;
+            }
+            else if (hacker_counter == pair_number && serf_counter >= pair_number)
+            {
+                hackers_fifo.release(pair_number);
+                serfs_fifo.release(pair_number);
+                serf_counter -= pair_number;
+                hacker_counter = 0;
+                isCaptain = true;
+            }
+            else
+            {
+                mutex.unlock();
+            }
+
+            hackers_fifo.acquire();
+            std::cout << "Hacker : Board the boat\n"; // board();
+            barrier.wait();
+
+            if (isCaptain)
+            {
+                std::cout << "Hacker : Captain rows the boat\n";// rowBoat();
+                mutex.unlock();
+            }
+        }
+
+        void execute_serf()
+        {
+            bool isCaptain = false;
+            mutex.lock();
+
+            serf_counter++;
+            if (serf_counter == single_number)
+            {
+                serfs_fifo.release(single_number);
+                serf_counter -= single_number;
+                isCaptain = true;
+            }
+            else if (serf_counter == pair_number && hacker_counter >= pair_number)
+            {
+                serfs_fifo.release(pair_number);
+                hackers_fifo.release(pair_number);
+                hacker_counter -= pair_number;
+                serf_counter = 0;
+                isCaptain = true;
+            }
+            else
+            {
+                mutex.unlock();
+            }
+
+            serfs_fifo.acquire();
+            std::cout << "Serf : Board the boat\n"; // board();
+            barrier.wait();
+
+            if (isCaptain)
+            {
+                std::cout << "Serf : Captain rows the boat\n";// rowBoat();
+                mutex.unlock();
+            }
+        }
+
+        void run()
+        {
+            std::vector<std::thread> threads;
+
+            for (int i = 0; i < single_number; ++i)
+            {
+                threads.push_back(std::thread(execute_hacker));
+                threads.push_back(std::thread(execute_serf));
+            }
+
+            for (auto& thread : threads)
+            {
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            }
+        }
+    }
+
+    namespace the_roller_coaster_problem
+    {
+        /*
+         - LOGIC OF RUNNING !!
+            Suppose there are n passenger threads and a car thread. The
+            passengers repeatedly wait to take rides in the car, which can hold
+            C passengers, where C < n. The car can go around the tracks only
+            when it is full.
+
+            • Passengers should invoke board and unboard.
+            • The car should invoke load, run and unload.
+            • Passengers cannot board until the car has invoked load
+            • The car cannot depart until C passengers have boarded.
+            • Passengers cannot unboard until the car has invoked unload.
+
+         - CODE OUTPUT !!
+
+         */
+    }
 }
 
 #endif //SEMAPHORE_EXAMPLES_CPP_LESS_CLASSICAL_SYNCHRONIZATION_PROBLEMS_H
