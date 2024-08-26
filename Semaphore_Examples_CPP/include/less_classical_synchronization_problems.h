@@ -396,31 +396,32 @@ namespace less_classical_synchronization_problems
                 mutex.lock();
                 if (customer_counter == n)
                 {
+                    // If barbershop is full.
                     mutex.unlock();
                     std::cout << std::this_thread::get_id() << ". customer is balked..\n"; // balk();
                     return;
                 }
-                customer_counter++;
-                queue1.push(s1);
+                customer_counter++; // barbershop is not full and a customer entered.
+                queue1.push(s1); // add this_thread own semaphore into the queue.
                 mutex.unlock();
 
                 std::cout << std::this_thread::get_id() << ". customer entered the barbershop..\n"; // enterShop();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-                customer1.release();
-                s1->acquire();
+                customer1.release(); // Signal that a customer is waiting to be served. This allows the barber to start processing.
+                s1->acquire(); // Wait till the barber is ready for shaving. When barber ready, he releases the semaphore.
 
-                sofa.acquire();
+                sofa.acquire(); // Customer who entered in the barbershop sat on sofa.
 
-                std::cout << std::this_thread::get_id() << ". customer sit on sofa..\n"; // sitOnSofa();
+                std::cout << std::this_thread::get_id() << ". customer sat on sofa..\n"; // sitOnSofa();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-                s1->release();
+                s1->release(); // Release the semaphore s1 after the customer has been served (sat on the sofa).
                 mutex.lock();
                 queue2.push(s2);
                 mutex.unlock();
-                customer2.release();
-                s2->acquire();
+                customer2.release(); // Signal that this customer is now ready to be served in the barber chair.
+                s2->acquire(); // Wait till the barber is ready for this customer (seated in the barber chair).
                 sofa.release();
 
                 std::cout << std::this_thread::get_id() << ". customer sit in barber chair..\n"; // sitInBarberChair();
@@ -429,32 +430,32 @@ namespace less_classical_synchronization_problems
                 std::cout << std::this_thread::get_id() << ". customer paid..\n"; // pay();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-                payment.release();
-                receipt.acquire();
+                payment.release(); // customer pay for shaving.
+                receipt.acquire(); // wait till the barber accept the payment.
 
                 mutex.lock();
-                customer_counter--;
+                customer_counter--; // 1 customer is done. Here using the mutex because to provide the sync.
                 mutex.unlock();
             }
         }
 
         void execute_barber() {
             while (true) {
-                customer1.acquire();
+                customer1.acquire(); // Wait till there is a customer who is ready to be served. This ensures the barber only works when there is a customer.
                 mutex.lock();
                 auto s = queue1.front();
-                queue1.pop();
-                s->release();
-                s->acquire();
+                queue1.pop(); // Get the semaphore for the customer waiting on the sofa (s1).
+                s->release(); // Allow the customer to proceed to the sofa.
+                s->acquire(); // Wait till the customer is seated on the sofa and is ready for the barber.
                 mutex.unlock();
-                s->release();
+                s->release(); // Release the semaphore after ensuring the customer is ready.
 
-                customer2.acquire();
+                customer2.acquire(); // Wait till the customer is ready to get into the barber chair.
                 mutex.lock();
-                s = queue2.front();
+                s = queue2.front(); // Get the semaphore for the customer waiting in the barber chair queue (s2).s
                 queue2.pop();
                 mutex.unlock();
-                s->release();
+                s->release(); // Allow the customer to get into the barber chair.
 
                 barber.release();
 
