@@ -1,7 +1,17 @@
 import threading
 
-# A program might work correctly 1000 times in a row, and then crash on the 1001st run,
-# depending on the particular decisions of the scheduler.
+"""
+         Concurrent Programs : Multiple threads of execution, all occuring at the same time.
+         Concurrent programs are often non-deterministic. So, it is hard to see what will happen.
+
+        Thread A            Thread B
+        print " yes "       print " no "
+
+         - CODE OUTPUT !!
+         The order in which messages are printed depends on the running order of the threads
+         because threads run in parallel with each other and there is no specific order.
+         The operating system determines this order. Therefore, the order of the “YES!” and “NO!” messages may be different in each run.
+"""
 
 def thread_a():
     print('YES')
