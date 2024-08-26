@@ -7,7 +7,7 @@
 
 #include <thread>
 #include <utility>
-#include <vector>
+#include <queue>
 #include <iostream>
 #include <random>
 
@@ -19,8 +19,31 @@ namespace classical_synchronization_problems
         - What is the PRODUCER-CONSUMER Problem !!
 
         - WARNING !!
-        This example to long, because of that, in this example, there is more than one example implementation.
+        This example too long, because of that, in this example, there is more than one example implementation.
         Pay attention to the comment sectins.
+
+        - LOGIC OF RUNNING !!
+
+        Producer :
+        A producer thread continuously generates an event and adds it to the buffer. After this addition,
+        the mutex (item) is unlocked and access to the critical section is allowed.
+        The items.release() function called afterwards signals the consumer to execute the event.
+        The consumer cannot execute the event until this signal is given.
+
+        Consumer :
+        For items.acquire() to work, the value must be greater than 0. After acquire(), if the critical section is empty,
+        the thread enters and pops an event from the buffer to execute. After the pop, it exits the critical section and releases the mutex and executes the event.
+
+        - CODE OUTPUT !!
+
+        Example Output:
+        76 is processed...
+        96 is processed...
+        92 is processed...
+        12 is processed...
+        8 is processed...
+        63 is processed...
+
      */
 
     class Event
@@ -28,7 +51,6 @@ namespace classical_synchronization_problems
     public:
         explicit Event(std::string _eventName = "noEvent") : eventName(std::move(_eventName)) {}
         void process() { std::cout << eventName << " is processed..." << std::endl; }
-    private:
         std::string eventName;
     };
 
@@ -39,7 +61,7 @@ namespace classical_synchronization_problems
         // When items is positive, it indicates the number of items in the buffer.
         // When it is negative, it indicates the number of consumer threads in queue
         std::counting_semaphore<3> items(0);
-        std::vector<Event> infiniteEventBuffer;
+        std::queue<Event> infiniteEventBuffer;
 
         Event waitForEvent()
         {
@@ -51,7 +73,34 @@ namespace classical_synchronization_problems
             return event;
         }
 
+/*
+        // REGULAR SOLUTION
         void producer_execute()
+        {
+            // WaitForEvent
+            Event event = waitForEvent(); // Local event
+            mutex.lock();
+            // buffer.add(event)
+            infiniteEventBuffer.push(event);
+            items.release();
+            // items.release();
+            mutex.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+*/
+
+/*
+        - WHY IT IS BETTER !!!
+        Performance:
+        By releasing the mutex before signaling the semaphore, you avoid holding the mutex while notifying consumers,
+        reducing the chance of unnecessary contention. This can lead to better performance
+        because consumers can acquire the mutex without waiting for the producer to finish its operations.
+
+        Efficiency:
+        It avoids the scenario where a consumer is blocked waiting for the semaphore while the mutex is held by the producer.
+        This helps in reducing the waiting time for consumers and can lead to more efficient execution.
+*/
+        void improved_producer_execute()
         {
             while (true)
             {
@@ -59,14 +108,43 @@ namespace classical_synchronization_problems
                 Event event = waitForEvent(); // Local event
                 mutex.lock();
                 // buffer.add(event)
-                infiniteEventBuffer.push_back(event);
+                infiniteEventBuffer.push(event);
                 // items.release();
                 mutex.unlock();
                 // If we use items.release() out off the mutex, that means improved producer solution
                 items.release();
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(2000));
             }
         }
+
+/*
+        - WHY IT IS BROKEN !!
+
+        Blocking with Mutex Held:
+        By acquiring the mutex before waiting on the semaphore (items.wait()),
+        the consumer holds the mutex while it could potentially be blocked on the semaphore.
+        This leads to inefficient use of the mutex and can cause other threads that need the mutex to be blocked unnecessarily.
+
+        Reduced Efficiency:
+        The holding of the mutex while waiting for an item to be available can lead to increased
+        contention and potential delays, reducing the overall efficiency of the system.
+
+        - BOOK EXPLANATION !!
+
+        it can cause a deadlock. Imagine that the buffer is empty. A consumer arrives, gets the mutex, and then blocks on items.
+        When the producer arrives, it blocks on mutex and the system comes to a grinding halt.
+        This is a common error in synchronization code: any time you wait for a  semaphore while holding a mutex,
+        there is a danger of deadlock. When you are checking a solution to a synchronization problem, you should check for this kind of deadlock.
+
+        void broken_consumer_execute()
+        {
+            mutex.lock();
+            items.acquire();
+            Event event = infiniteEventBuffer.back(); // Local event
+            mutex.unlock();
+            event.process();
+        }
+*/
 
         void consumer_execute()
         {
@@ -74,31 +152,26 @@ namespace classical_synchronization_problems
             {
                 items.acquire();
                 mutex.lock();
-
-                // Bad Consumer Solution - DEADLOCK PROBLEM
-                // If we use items.acquire() in the mutex, that means broken consumer solution.That causes deadlock problem.
-                // items.acquire();
-
-                Event event = infiniteEventBuffer.back(); // Local event
-                infiniteEventBuffer.pop_back();
+                Event event = infiniteEventBuffer.front(); // Local event
+                infiniteEventBuffer.pop();
                 mutex.unlock();
                 event.process();
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(2000));
             }
         }
 
         void run()
         {
-            constexpr uint8_t maxElementNumver = 3;
-            std::thread producers[maxElementNumver], consumers[maxElementNumver];
+            constexpr uint8_t maxElementNumber = 3;
+            std::thread producers[maxElementNumber], consumers[maxElementNumber];
 
-            for (int i = 0; i < maxElementNumver; ++i)
+            for (int i = 0; i < maxElementNumber; ++i)
             {
-                producers[i] = std::thread(producer_execute);
+                producers[i] = std::thread(improved_producer_execute);
                 consumers[i] = std::thread(consumer_execute);
             }
 
-            for (int i = 0; i < maxElementNumver; ++i)
+            for (int i = 0; i < maxElementNumber; ++i)
             {
                 producers[i].join();
                 consumers[i].join();
@@ -110,10 +183,18 @@ namespace classical_synchronization_problems
     {
         /*
          - Broken Finite Buffer Solution !!
-         if items >= bufferSize :
-            block ()
+         if (items >= bufferSize)
+         {
+            block();
+         }
 
          This implementation does not work properly. Remember that we can’t check the current value of a semaphore
+
+         - LOGIC OF RUNNING !!
+            Compared to the previous example, this example is more fault tolerant and controlled because we control the buffer occupancy.
+
+         - CODE OUTPUT !!
+            Same output instance like in infinite producer-consumer problem
          */
 
         // Exclusive access to the buffer
@@ -121,7 +202,7 @@ namespace classical_synchronization_problems
         // When items is positive, it indicates the number of items in the buffer.
         // When it is negative, it indicates the number of consumer threads in queue
         std::counting_semaphore<3> items(0);
-        std::vector<Event> infiniteEventBuffer;
+        std::queue<Event> infiniteEventBuffer;
         const int bufferSize = 3;
         std::counting_semaphore<bufferSize> space(bufferSize);
 
@@ -144,8 +225,7 @@ namespace classical_synchronization_problems
                 space.acquire();
                 mutex.lock();
                 // buffer.add(event)
-                infiniteEventBuffer.push_back(event);
-                std::cout << "Buffer Size : " << infiniteEventBuffer.size() << std::endl;
+                infiniteEventBuffer.push(event);
                 // items.release();
                 mutex.unlock();
                 // If we use items.release() out off the mutex, that means improved producer solution
@@ -165,8 +245,8 @@ namespace classical_synchronization_problems
                 // If we use items.acquire() in the mutex, that means broken consumer solution.That causes deadlock problem.
                 // items.acquire();
 
-                Event event = infiniteEventBuffer.back(); // Local event
-                infiniteEventBuffer.pop_back();
+                Event event = infiniteEventBuffer.front(); // Local event
+                infiniteEventBuffer.pop();
                 mutex.unlock();
                 space.release(); // If we put in comment this line, when buffer is full, program gets in deadlock.
 
@@ -177,16 +257,16 @@ namespace classical_synchronization_problems
 
         void run()
         {
-            constexpr uint8_t maxElementNumver = 3;
-            std::thread producers[maxElementNumver], consumers[maxElementNumver];
+            constexpr uint8_t maxElementNumber = 3;
+            std::thread producers[maxElementNumber], consumers[maxElementNumber];
 
-            for (int i = 0; i < maxElementNumver; ++i)
+            for (int i = 0; i < maxElementNumber; ++i)
             {
                 producers[i] = std::thread(producer_execute);
                 consumers[i] = std::thread(consumer_execute);
             }
 
-            for (int i = 0; i < maxElementNumver; ++i)
+            for (int i = 0; i < maxElementNumber; ++i)
             {
                 producers[i].join();
                 consumers[i].join();
@@ -210,7 +290,7 @@ namespace classical_synchronization_problems
          This situation is not a deadlock, because some threads are making progress, but it is not exactly desirable.
 
          - WRITER-PRIORITY SOLUTION !!
-
+         
          */
 
         class Lightswitch
@@ -520,6 +600,252 @@ namespace classical_synchronization_problems
                     thread.join();
                 }
             }
+        }
+    }
+
+    namespace cigarette_smokers_deadlock
+    {
+        // THIS EXAMPLE FOCUSES ON INTERESTING VERSION IN "LittleBookOfSemaphores" !!
+
+        /*
+            PROBLEM OF THE SOLUTION - BOOK EXPLANATION
+
+            At the beginning , This example has the possibility of deadlock.
+            Imagine that the agent puts out tobacco and paper. Since the smoker with matches is waiting on tobacco,
+            it might be unblocked. But the smoker with tobacco is waiting on paper,
+            so it is possible (even likely) that it will also be unblocked.
+            Then the first thread will block on paper and the second will block on match. Deadlock!
+
+         */
+
+        constexpr uint8_t agentsAmount = 3;
+        constexpr uint8_t smokersAmount = 3;
+
+        std::binary_semaphore agentSem(1);
+        std::binary_semaphore tobacco(0);
+        std::binary_semaphore paper(0);
+        std::binary_semaphore match(0);
+
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        {
+            while (1)
+            {
+                agentSem.acquire();
+                _ingredients1.release();
+                _ingredients2.release();
+            }
+        }
+
+        void execute_smokers(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        {
+            while (1)
+            {
+                _ingredients1.acquire();
+                _ingredients2.acquire();
+                agentSem.release();
+            }
+        }
+
+        void run()
+        {
+            std::array<std::thread, agentsAmount> agents = {
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+            };
+
+            std::array<std::thread, smokersAmount> smokers = {
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(paper)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(paper), std::ref(match)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(match))  // Smoker with paper
+            };
+
+            for (auto& agent : agents)   { if (agent.joinable())  { agent.join();  } }
+            for (auto& smoker : smokers) { if (smoker.joinable()) { smoker.join(); } }
+        }
+    }
+
+    namespace cigarette_smokers_parnas_solution
+    {
+        // To solve deadlock
+        // The boolean variables indicate whether or not an ingredient is on the table
+        std::atomic<bool> isTobacco{false};
+        std::atomic<bool> isPaper{false};
+        std::atomic<bool> isMatch{false};
+
+        // Beginning Code
+        constexpr uint8_t agentsAmount = 3;
+        constexpr uint8_t smokersAmount = 3;
+
+        std::mutex mutex;
+
+        std::binary_semaphore agentSem(1);
+        std::binary_semaphore tobacco(0);
+        std::binary_semaphore paper(0);
+        std::binary_semaphore match(0);
+
+        void execute_pusher(std::binary_semaphore& _mainIngredient, std::binary_semaphore& _ingredient1, std::binary_semaphore& _ingredient2,
+                            std::atomic<bool>& _mainIndicator,      std::atomic<bool>& _indicator1,      std::atomic<bool>& _indicator2)
+        {
+            {
+                _mainIngredient.acquire();
+                mutex.lock();
+
+                if (_indicator1)
+                {
+                    _indicator1 = false;
+                    _ingredient2.release();
+                }
+                else if (_indicator2)
+                {
+                    _indicator2 = false;
+                    _ingredient1.release();
+                }
+                else
+                {
+                    _mainIndicator = true;
+                }
+
+                mutex.unlock();
+            }
+        }
+
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        {
+            while(true)
+            {
+                agentSem.acquire();
+                _ingredients1.release();
+                _ingredients2.release();
+            }
+        }
+
+        void execute_smokers(std::binary_semaphore& _mainIngredients)
+        {
+            while(true)
+            {
+                _mainIngredients.acquire();
+                // Make Cigaratte - no need to implement
+                agentSem.release();
+                // Smoke - no need to implement
+            }
+        }
+
+        void run()
+        {
+            std::array<std::thread, agentsAmount> agents = {
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+            };
+
+            std::array<std::thread, smokersAmount> smokers = {
+                    std::thread(execute_smokers, std::ref(match)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(tobacco)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(paper))  // Smoker with paper
+            };
+
+            std::array<std::thread, agentsAmount> pushers = {
+                    std::thread(execute_pusher, std::ref(tobacco), std::ref(paper),   std::ref(match), std::ref(isTobacco), std::ref(isPaper),   std::ref(isMatch)), // Pusher A
+                    std::thread(execute_pusher, std::ref(paper),   std::ref(tobacco), std::ref(match), std::ref(isPaper),   std::ref(isTobacco), std::ref(isMatch)), // Pusher B
+                    std::thread(execute_pusher, std::ref(match),   std::ref(tobacco), std::ref(paper), std::ref(isMatch),   std::ref(isTobacco), std::ref(isPaper))  // Pusher C
+            };
+
+            for (auto &agent: agents)   { if (agent.joinable())  { agent.join();  }}
+            for (auto &smoker: smokers) { if (smoker.joinable()) { smoker.join(); }}
+            for (auto &pusher: pushers) { if (pusher.joinable()) { pusher.join(); }}
+        }
+    }
+
+    namespace cigarette_smokers_generalized_solution
+    {
+        // If the agents don’t wait for the smokers, ingredients might accumulate on the table.
+        // Instead of using boolean values to keep track of ingredients, we need integers to count them.
+        int numTobacco = 0;
+        int numPaper = 0;
+        int numMatch = 0;
+
+        // Beginning Code
+        constexpr uint8_t agentsAmount = 3;
+        constexpr uint8_t smokersAmount = 3;
+
+        std::mutex mutex;
+
+        std::binary_semaphore agentSem(1);
+        std::binary_semaphore tobacco(0);
+        std::binary_semaphore paper(0);
+        std::binary_semaphore match(0);
+
+        void execute_pusher(std::binary_semaphore& _mainIngredient, std::binary_semaphore& _ingredient1, std::binary_semaphore& _ingredient2,
+                            int& _mainIndicator, int& _indicator1, int& _indicator2)
+        {
+            {
+                _mainIngredient.acquire();
+                mutex.lock();
+
+                if (_indicator1)
+                {
+                    _indicator1--;
+                    _ingredient2.release();
+                }
+                else if (_indicator2)
+                {
+                    _indicator2--;
+                    _ingredient1.release();
+                }
+                else
+                {
+                    _mainIndicator++;
+                }
+
+                mutex.unlock();
+            }
+        }
+
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        {
+            while(true)
+            {
+                agentSem.acquire();
+                _ingredients1.release();
+                _ingredients2.release();
+            }
+        }
+
+        void execute_smokers(std::binary_semaphore& _mainIngredients)
+        {
+            while(true)
+            {
+                _mainIngredients.acquire();
+                // Make Cigaratte - no need to implement
+                agentSem.release();
+                // Smoke - no need to implement
+            }
+        }
+
+        void run()
+        {
+            std::array<std::thread, agentsAmount> agents = {
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+            };
+
+            std::array<std::thread, smokersAmount> smokers = {
+                    std::thread(execute_smokers, std::ref(match)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(tobacco)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(paper))  // Smoker with paper
+            };
+
+            std::array<std::thread, agentsAmount> pushers = {
+                    std::thread(execute_pusher, std::ref(tobacco), std::ref(paper),   std::ref(match), std::ref(numTobacco), std::ref(numPaper),   std::ref(numMatch)), // Pusher A
+                    std::thread(execute_pusher, std::ref(paper),   std::ref(tobacco), std::ref(match), std::ref(numPaper),   std::ref(numTobacco), std::ref(numMatch)), // Pusher B
+                    std::thread(execute_pusher, std::ref(match),   std::ref(tobacco), std::ref(paper), std::ref(numMatch),   std::ref(numTobacco), std::ref(numPaper))  // Pusher C
+            };
+
+            for (auto &agent: agents)   { if (agent.joinable())  { agent.join();  }}
+            for (auto &smoker: smokers) { if (smoker.joinable()) { smoker.join(); }}
+            for (auto &pusher: pushers) { if (pusher.joinable()) { pusher.join(); }}
         }
     }
 }
