@@ -1,9 +1,16 @@
 import threading
 
-# This code has deadlock problem.
-# The reason of deadlock is the second turnstile.acquire() can cause a deadlock
-# because if the last thread to decrement count is the same one that released the semaphore,
-# no other thread will be able to release it again.
+"""
+         This code seems to write corrcet but there is some kind of synch problems.
+
+         Potential Deadlock:
+         The second turnstile.acquire() could cause a deadlock because if the last thread to decrement count
+         is the same one that released the semaphore, no other thread will be able to release it again.
+
+         - CODE OUTPUT !!
+         The code can give output and this output is “Reusable barrier reached to the end!” as many as the number of threads.
+         However, due to a logic error in the code, the code may enter deadlock. In this case there is no output.
+"""
 
 n = 3 # amount of threads
 count = 0 # counted thread amount

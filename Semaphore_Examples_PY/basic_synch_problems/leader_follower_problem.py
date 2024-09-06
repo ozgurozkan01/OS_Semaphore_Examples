@@ -1,5 +1,22 @@
 import threading
 
+"""
+         - LOGIC OF RUNNING !!
+         This code enables multithreading using mutex and semaphores to provide synchronization and matching between leaders and followers.
+         The goal of the code is to coordinate the pairing and dancing of leaders and followers and to ensure that both sides move in a synchronized manner.
+
+         A leader checks if there are followers. If there are followers, the leader and follower match.
+         If there are no followers, it is added to the leaders queue and waits. A follower checks if there are leaders.
+         If there are leaders, the follower and leader match. If there is no leader, it is added to the followers queue and waits.
+
+         Both sides are made to dance and synchronize. rendezvous semaphore allows leaders and followers to dance in synchronization and come together collectively.
+
+         - CODE OUTPUT !!
+         The output of this code is follower, leader , follower , leader respectively. However, it does not matter who the follower and leader are.
+         The code guarantees that there is only one follower and one leader in the scene at the same time.
+         In the output you can see that the number of consecutive followers and leaders changes according to the thread speed, but each time the follower and leader are consecutive.
+"""
+
 leaders = 0
 followers = 0
 

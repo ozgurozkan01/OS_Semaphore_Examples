@@ -1,15 +1,21 @@
 import threading
 
-#      - DEFINITION OF PRELOADED TURNSTILE !!
-#      A preloaded turnstile is a turnstile synchronization component that is initialized with
-#      a predefined number of signals before threads attempt to pass through it.
-#      This preloading mechanism allows a specified number of threads to pass through the turnstile simultaneously,
-#      reducing the overhead associated with sequential thread passage.
-#
-#      - LOGIC OF RUNNING !!
-#      When the nth thread arrives, it preloads the first turnstile with one signal for each thread.
-#      When the nth thread passes the turnstile, it “takes the last token” and leaves the turnstile locked again.
-#      The same thing happens at the second turnstile, which is unlocked when the last thread goes through the mutex.
+"""
+    - DEFINITION OF PRELOADED TURNSTILE !!
+    A preloaded turnstile is a turnstile synchronization component that is initialized with
+    a predefined number of signals before threads attempt to pass through it.
+    This preloading mechanism allows a specified number of threads to pass through the turnstile simultaneously,
+    reducing the overhead associated with sequential thread passage.
+
+    - LOGIC OF RUNNING !!
+    When the nth thread arrives, it preloads the first turnstile with one signal for each thread.
+    When the nth thread passes the turnstile, it “takes the last token” and leaves the turnstile locked again.
+    The same thing happens at the second turnstile, which is unlocked when the last thread goes through the mutex.
+    
+    - CODE OUTPUT !!
+    The output is n pieces “Preloaded barrier reached to the end!”.
+"""
+
 
 n = 5
 count = 0

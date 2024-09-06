@@ -1,37 +1,62 @@
 import threading
 
-# This code seems correct, but it has some synch problems which can cause deadlock.
-# 
+"""
+         To solve deadlock problem, we use 2 turnstile semaphore.
 
-n = 3 # amount of threads
-count = 0 # counted thread amount
-mutex = threading.Semaphore(1)
+         turnstile:
+         This semaphore is used to synchronize threads at the first barrier point.
+         It ensures that all threads wait until the last thread has reached the barrier before proceeding.
+         It is initialized to 0, meaning threads will block on turnstile.acquire() until it is released by the last thread.
+
+         turnstile2:
+         This semaphore is used to manage a second phase of synchronization, essentially acting as a signal for the second barrier point.
+         It is initialized to 1, so it starts in the "unlocked" state. This allows the first thread to proceed after all threads have passed the first barrier.
+         It ensures that once all threads have reached the first barrier and proceeded, they wait for all threads to reach the second barrier before continuing.
+
+         - CODE OUTPUT !!
+         The output is n pieces “Reusable barrier reached to the end!”.
+"""
+
+import threading
+
+n = 5
+count = 0
+mutex = threading.Lock()
 turnstile = threading.Semaphore(0)
+turnstile2 = threading.Semaphore(1)
 
-def thread_run():
+def execute():
     global count
 
-    mutex.acquire()
-    count += 1
-    if count == n: turnstile.release()
-    mutex.release()
+    # First section: Using lock for synchronization
+    with mutex:
+        count += 1
+        if count == n:
+            turnstile2.acquire()  # Lock turnstile2
+            turnstile.release()   # Unlock turnstile for the first thread
 
-    turnstile.acquire()
-    turnstile.release()
+    turnstile.acquire()  # Blocking for the first thread
+    turnstile.release()  # When the first thread is released, it releases the thread that comes after it
 
-    mutex.acquire()
-    count -= 1
-    if count == 0: turnstile.acquire()
-    mutex.release()
+    # Second section: Using lock for synchronization again
+    with mutex:
+        count -= 1
+        if count == 0:
+            turnstile.acquire()  # Lock turnstile
+            turnstile2.release() # Unlock turnstile2 for the first thread
 
-t1= threading.Thread(target=thread_run)
-t2 = threading.Thread(target=thread_run)
-t3 = threading.Thread(target=thread_run)
+    turnstile2.acquire()  # Blocking for the first thread
+    turnstile2.release()  # When the first thread is released, it releases the thread that comes after it
 
-t1.start()
-t2.start()
-t3.start()
+    print("Reusable barrier reached to the end!")
 
-t1.join()
-t2.join()
-t3.join()
+
+threads = []
+for _ in range(n):
+    t = threading.Thread(target=execute)
+    threads.append(t)
+    t.start()
+
+for t in threads:
+    if t.is_alive():
+        t.join()
