@@ -8,6 +8,10 @@ import threading
             • It must be impossible for a deadlock to occur.
             • It must be impossible for a philosopher to starve waiting for a fork.
             • It must be possible for more than one philosopher to eat at the same time.
+            
+         This solution uses a footman, a “servant” or control mechanism. The footman counter initially has a value of 4,
+         which means that a maximum of 4 philosophers can be at the table at the same time. This prevents 5 philosophers
+         from requesting cutlery at the same time, which eliminates the possibility of deadlock.
 '''
 
 philosopherAmount = 5

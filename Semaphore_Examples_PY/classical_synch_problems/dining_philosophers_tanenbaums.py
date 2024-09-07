@@ -2,8 +2,19 @@ import threading
 from enum import Enum
 
 '''
+    - CONSTRAINTS !!
+    • Only one philosopher can hold a fork at a time.
+    • It must be impossible for a deadlock to occur.
+    • It must be impossible for a philosopher to starve waiting for a fork.
+    • It must be possible for more than one philosopher to eat at the same time.
+    
     In this solution while Tanenbaum’s solution effectively avoids deadlock, it does not fully address starvation.
     Further enhancements are required to ensure that no philosopher is left waiting indefinitely.
+    
+    In Tanenbaum's solution, philosophers exist in three states: thinking, hungry, hungry, eating.
+    The functions get_forks and put_forks allow each philosopher to eat or wait based on its state (EState).
+    The test function checks whether each philosopher is allowed to eat based on the state of other philosophers around it. If the neighbors are not eating, the philosopher starts eating.
+    This solution avoids deadlock, but starvation may not be completely resolved.
 '''
 
 philosopherAmount = 5
@@ -35,9 +46,16 @@ def put_forks(_index):
     test(left(_index))
     mutex.release()
 
+# This function checks the conditions under which a philosopher can eat
+# and, if appropriate, allows that philosopher to pick up a fork and eat.
+# This ensures synchronization and prevents philosophers from entering
+# deadlock or starvation states.
 def test(_index):
+    # If this philosopher's condition is hungry and
+    # If the philosopher to your left (left) and right (right) are not eating:
     if states[_index] == State.HUNGRY and states[left(_index)] != State.EATING and states[right(_index)] != State.EATING:
         states[_index] = State.EATING
+        # This philosopher is allowed to eat (forks semaphore released)
         forks[_index].release()
 
 def execute(_index):

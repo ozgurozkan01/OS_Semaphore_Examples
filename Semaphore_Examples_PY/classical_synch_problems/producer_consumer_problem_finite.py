@@ -1,67 +1,91 @@
-import queue
 import threading
-import time
+import queue
 import random
+import time
 
-'''
-    if items >= bufferSize :
-        block ()
+# Exclusive access to the buffer
+mutex = threading.Lock()
+# When items is positive, it indicates the number of items in the buffer.
+# When it is negative, it indicates the number of consumer threads in queue
+items = threading.Semaphore(0)
+buffer_size = 3
+space = threading.Semaphore(buffer_size)
+infinite_event_buffer = queue.Queue()
+
+def wait_for_event():
+    # Random Number Generator: Better than rand() implementation
+    event = str(random.randint(1, 100))  # Random int number between 1-100
+    return event
+
+"""
+    - Broken Finite Buffer Solution !!
+    if (items >= bufferSize)
+    {
+        block();
+    }
     
     This implementation does not work properly. Remember that we can’t check the current value of a semaphore
-'''
+    
+    - LOGIC OF RUNNING !!
+       Compared to the previous example, this example is more fault tolerant and controlled because we control the buffer occupancy.
+    
+    - CODE OUTPUT !!
+       Same output instance like in infinite producer-consumer problem
+"""
 
-bufferSize = 3
-mutex = threading.Semaphore(1)
-items = threading.Semaphore(0) # initial value is zero beacuse the buffer is empty in the beginning
-buffer = queue.Queue()
-# When a consumer removes an item it should signal spaces. When a producer
-# arrives it should decrement spaces, at which point it might block until the next
-# consumer signals.
-spaces = threading.Semaphore(bufferSize)
-
-class Event:
-    def __init__(self, eventName):
-        self.eventName = eventName
-    def process(self):
-        print(f"{self.eventName}. event is processsing")
-
-def waitForEvent():
-    randomInt = random.randint(1, 100)
-    newEvent = Event(randomInt)
-    time.sleep(2) # wait for 2 seconds
-    return newEvent
-
-def execute_producer():
+def producer_execute():
     while True:
-        event = waitForEvent()
-        spaces.acquire()
+        # WaitForEvent
+        event = wait_for_event()  # Local event
+        space.acquire()
         mutex.acquire()
-        buffer.put(event)
+        # buffer.add(event)
+        infinite_event_buffer.put(event)
+        # items.release()
         mutex.release()
+        # If we use items.release() outside of the mutex, that means improved producer solution
         items.release()
-        time.sleep(1) # custom code piece
+        time.sleep(1)
 
-def execute_consumer():
+def consumer_execute():
     while True:
         items.acquire()
         mutex.acquire()
-        event = buffer.get()
+
+        # Bad Consumer Solution - DEADLOCK PROBLEM
+        # If we use items.acquire() in the mutex, that means broken consumer solution. That causes deadlock problem.
+        # items.acquire()
+
+        event = infinite_event_buffer.get()  # Local event
         mutex.release()
-        spaces.release()
-        event.process()
-        time.sleep(1) # custom code piece
+        space.release()  # If we comment this line out, the program gets into deadlock when the buffer is full.
 
-producers = [threading.Thread(target=execute_producer) for _ in range(3)]
-consumers = [threading.Thread(target=execute_consumer) for _ in range(3)]
+        process(event)
+        time.sleep(1)
 
-for producer in producers:
-    producer.start()
+def process(event):
+    print(f"{event} is processed...")
 
-for consumer in consumers:
-    consumer.start()
+def run():
+    max_element_number = 3
+    producers = []
+    consumers = []
 
-for producer in producers:
-    producer.join()
+    for _ in range(max_element_number):
+        producer_thread = threading.Thread(target=producer_execute)
+        consumer_thread = threading.Thread(target=consumer_execute)
+        producers.append(producer_thread)
+        consumers.append(consumer_thread)
 
-for consumer in consumers:
-    consumer.join()
+    for p in producers:
+        p.start()
+    for c in consumers:
+        c.start()
+
+    for p in producers:
+        p.join()
+    for c in consumers:
+        c.join()
+
+if __name__ == "__main__":
+    run()

@@ -1,6 +1,8 @@
 import threading
 
-# -------------------------------------
+"""
+    All benchmarks and explanations are in readers_writers.py.
+"""
 
 class Lightswitch:
     def __init__(self):
@@ -22,22 +24,6 @@ class Lightswitch:
         self.mutex.release()
 
 # -------------------------------------
-
-'''
-
-         - ANALOGY !!
-         Lightswitch, by analogy with the pattern where the first person into a room turns on the light (locks the mutex)
-         and the last one out turns it off (unlocks the mutex).
-
-         - WARNING ( STARVING PROBLEM )!!
-         In this example, deadlock is not possible, but there is a related problem that is almost as bad: it is possible for a writer to starve.
-         If a writer arrives while there are readers in the critical section, it might wait in queue forever while readers come and go.
-         As long as a new reader arrives before the last of the current readers departs, there will always be at least one reader in the room.
-
-         - PAY ATTENTION !!
-         This situation is not a deadlock, because some threads are making progress, but it is not exactly desirable.
-
-'''
 
 readSwitch = Lightswitch()
 writeSwitch = Lightswitch()
