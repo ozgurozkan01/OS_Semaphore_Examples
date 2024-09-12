@@ -130,6 +130,7 @@ namespace less_classical_synchronization_problems
             Barber cut the customers hair...
             6. customer got hair cut..
 
+         - ATTENTION !!
            As u see, no guarantee the barber is gonna cut the customers' hairs in order. So that is the problem.
            Up to n customers can pass the turnstile, signal customer and wait on barber.
            When the barber signal barber, any of the customers might proceed.
@@ -211,6 +212,28 @@ namespace less_classical_synchronization_problems
     namespace the_fifo_barbershop_problem
     {
         /*
+        - PURPOSE of USING FIFO !!
+            1. Sequential Service :
+            The FIFO method ensures that customer service is provided in the order in which the customer enters the queue.
+            This guarantees a fair delivery of services and ensures fairness with respect to any customer's entry into the queue.
+            2. Fairness and Uniformity :
+            FIFO ensures that each customer receives service according to the order in which they enter the queue.
+            This allocates customers' waiting time to receive service fairly and any customer should be in front to receive service.
+
+         - USAGE PRINCIPLE OF FIFO !!
+            In the barbershop problem, the FIFO (First-In-First-Out) principle
+            ensures that customers receive service in a fair and orderly manner.
+            When customers enter the shop, they are sorted according to the FIFO
+            order and added to a queue structure. This structure guarantees that
+            the first customer to arrive is served first.
+
+            Each customer has its own semaphore in the queue and is woken up by
+            this semaphore when the barber is ready. The barber serves the
+            customer at the head of the queue and releases the customer's
+            semaphore when he is done. This arrangement ensures that services are
+            rendered in an orderly and fair manner, keeps transactions organized
+            and provides an efficient barber service.
+
          - CODE OUTPUT !!
             In previous solution, there is no guarantee the barber cut the customers' hair in order.
             In this solution, we use the queue and every thread is using its own semaphore.
@@ -361,7 +384,6 @@ namespace less_classical_synchronization_problems
             9. customer entered the barbershop..
             22. customer entered the barbershop..
             18. customer entered the barbershop..
-
             24. customer is balked..
             5. customer sit on sofa..
             2. customer cut hair..
@@ -682,8 +704,23 @@ namespace less_classical_synchronization_problems
             present, it has to wait for an oxygen thread and another hydrogen thread.
 
          - CODE OUTPUT !!
-
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
+            2 atoms bound each other!
          */
+
         std::mutex mutex; // mutex for protecting shared variables
         int oxygen_counter = 0; // count of waiting oxygen threads
         int hydrogen_counter = 0; // count of waiting hydrogen threads
