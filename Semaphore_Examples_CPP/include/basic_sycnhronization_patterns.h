@@ -185,6 +185,14 @@ namespace basic_synchronization_patterns
          Thread A                    Thread B
          1 count = count + 1         1 count = count + 1
 
+        --------- * --------- * --------- * --------- * ---------
+
+         Thread A                    Thread B
+         1 mutex . wait ()           1 mutex . wait ()
+         2 # critical section        2 # critical section
+         3 count = count + 1         3 count = count + 1
+         4 mutex . signal ()         4 mutex . signal ()
+
          - CODE OUTPUT !!
         This code gives output as 20.000.000 thanks to mutex. Because mutex ensures that the threads reach the value x with a synchronization.
         That means if a thread reaches the value, other threads wait until the mutex is available.
@@ -222,7 +230,6 @@ namespace basic_synchronization_patterns
     namespace multiplex
     {
         /*
-
         MULTIPLEX : To allow multiple threads run in the critical section. To do that, we can use Semaphore which is value bigger than 1.
 
         In program, there are 5 threads but the semaphore has 4 as max value.
@@ -232,11 +239,11 @@ namespace basic_synchronization_patterns
         We could not release the threads to show when semaphore is full threads cannot get inside.
         But at the same time, we saw that multiple threads can run at the same time
 
-         - CODE OUTPUT !!
-         The output of this code is the “. thread is running...” output that 4 threads will print,
-         but the 5th thread cannot enter because there is no space in the multiplex and therefore cannot output.
+        - CODE OUTPUT !!
+        The output of this code is the “. thread is running...” output that 4 threads will print,
+        but the 5th thread cannot enter because there is no space in the multiplex and therefore cannot output.
 
-         !! To run the correct program, put any thread in the comment line.
+        !! To run the correct program, put any thread in the comment line.
          */
 
         std::counting_semaphore<4> multiplex(4);
@@ -244,7 +251,14 @@ namespace basic_synchronization_patterns
         void execute(int _no)
         {
             multiplex.acquire();
+/*             In this section, threads the size of multiplex can run at the same time.
+             If u run the program like this order, the code get in the deadlock.
+             Becuase "NO RELEASING".
+             That proves the "threads the size of multiplex can run at the same time."
+             Because when 4 thread get in the critical section, 5. thread has to wait.*/
             std::cout << _no << ". thread is running...\n";
+            // TODO : For correct solution uncomment this line.
+            // multiplex.release();
         }
 
         void run()
