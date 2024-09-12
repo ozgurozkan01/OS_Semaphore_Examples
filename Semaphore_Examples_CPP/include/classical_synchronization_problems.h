@@ -10,17 +10,27 @@
 #include <queue>
 #include <iostream>
 #include <random>
-
-#define WRITER_PRIORITY 1
+#include <array>
 
 namespace classical_synchronization_problems
 {
     /*
-        - What is the PRODUCER-CONSUMER Problem !!
-
         - WARNING !!
         This example too long, because of that, in this example, there is more than one example implementation.
         Pay attention to the comment sectins.
+     */
+
+    class Event
+    {
+    public:
+        explicit Event(std::string _eventName = "noEvent") : eventName(std::move(_eventName)) {}
+        void process() { std::cout << eventName << " is processed..." << std::endl; }
+        std::string eventName;
+    };
+
+    namespace producer_consumer_problem_infinite
+    {
+        /*
 
         - LOGIC OF RUNNING !!
 
@@ -44,18 +54,8 @@ namespace classical_synchronization_problems
         8 is processed...
         63 is processed...
 
-     */
+         */
 
-    class Event
-    {
-    public:
-        explicit Event(std::string _eventName = "noEvent") : eventName(std::move(_eventName)) {}
-        void process() { std::cout << eventName << " is processed..." << std::endl; }
-        std::string eventName;
-    };
-
-    namespace producer_consumer_problem_infinite
-    {
         // Exclusive access to the buffer
         std::mutex mutex;
         // When items is positive, it indicates the number of items in the buffer.
@@ -277,10 +277,6 @@ namespace classical_synchronization_problems
     namespace readers_and_writers_problem
     {
         /*
-         - ANALOGY !!
-         Lightswitch, by analogy with the pattern where the first person into a room turns on the light (locks the mutex)
-         and the last one out turns it off (unlocks the mutex).
-
          - WARNING ( STARVING PROBLEM )!!
          In this example, deadlock is not possible, but there is a related problem that is almost as bad: it is possible for a writer to starve.
          If a writer arrives while there are readers in the critical section, it might wait in queue forever while readers come and go.
@@ -289,12 +285,49 @@ namespace classical_synchronization_problems
          - PAY ATTENTION !!
          This situation is not a deadlock, because some threads are making progress, but it is not exactly desirable.
 
-         - WRITER-PRIORITY SOLUTION !!
-         
+         - Writer Priority vs. No Writer Priority !!
+         In Writer Priority, writers are granted access before readers. This is achieved through the writeSwitch and noReaders mutexes,
+         so that a writer waits for all readers to exit before entering the critical region.
+         This approach provides fair access to writers while limiting access to readers, thus minimizing the risk of starvation of writers.
+         However, this may result in readers occupying the critical zone for too long, increasing the risk of writers being denied opportunities.
+
+         In No Writer Priority, on the other hand, writers and readers are treated equally.
+         turnstile mutex is used to ensure a fair queue between threads of both types.
+         This approach harbors a risk of scarcity, where readers can continuously occupy the critical region
+         because it gives no special priority to writers. If authors lose access opportunities, this can lead to scarcity problems.
+         Therefore, this method can create inequity in providing access to authors and cause performance problems.
+
+         - CODE OUTPUT !!
+         In both cases the code output is very similar. However, due to race conditions, if writers have priority,
+         it may be more likely that the writer is written first in the first output of the code.
+         In simultaneous writer and reader conditions, writer is written first.
+         Otherwise, it is difficult to observe a noticeable difference between the outputs.
+         The output may be the same in both cases.
+
+            Example Code of Writer-Priority
+                Writer-Priority : Reader in critical section
+                Writer-Priority : Writer in critical section
+                Writer-Priority : Writer in critical section
+                Writer-Priority : Reader in critical section
+
+            Example Code of No-Writer-Priority
+                No Writer-Priority : Writer in critical section
+                No Writer-Priority : Reader in critical section
+                No Writer-Priority : Writer in critical section
+                No Writer-Priority : Reader in critical section
          */
 
         class Lightswitch
         {
+            /*
+             - ANALOGY !!
+            Lightswitch, by analogy with the pattern where the first person into a room turns on the light (locks the mutex)
+            and the last one out turns it off (unlocks the mutex).
+
+             The Lightswitch class manages access to a critical section using a semaphore and a counter.
+             The lock method ensures that only the first reader will acquire the semaphore, and the last reader to leave will release it.
+             The unlock method releases the semaphore if there are no more readers.
+             */
         public:
             Lightswitch() : counter(0) {}
 
@@ -324,6 +357,8 @@ namespace classical_synchronization_problems
             std::mutex mutex;
         };
 
+        #define WRITER_PRIORITY 0
+
         // Code Base
         Lightswitch readLightSwitch;
         std::mutex roomEmpty; // 1 if there are no threads (readers or writers) in the critical section, and 0 otherwise
@@ -349,7 +384,7 @@ namespace classical_synchronization_problems
             turnstile.lock(); // To solve starving
 
             roomEmpty.lock();
-                std::cout << "Writer in critical section" << std::endl;
+                std::cout << "No Writer-Priority : Writer in critical section" << std::endl;
             turnstile.unlock(); // To solve starving
 
             roomEmpty.unlock();
@@ -369,7 +404,7 @@ namespace classical_synchronization_problems
             turnstile.unlock(); // To solve starving
 
             readLightSwitch.lock(roomEmpty);
-                std::cout << "Reader in critical section" << std::endl;
+                std::cout << "No Writer-Priority : Reader in critical section" << std::endl;
             readLightSwitch.unlock(roomEmpty);
         #endif
         }
@@ -389,7 +424,7 @@ namespace classical_synchronization_problems
         }
     }
 
-    namespace no_starving_mutex
+    namespace no_starve_mutex
     {
         /*
          - WHY MORRIS'S ALGORITHM IS USED !!
@@ -403,6 +438,37 @@ namespace classical_synchronization_problems
             Phase 1 ensures that threads are managed fairly before they enter the critical section.
             By using t1 and t2, the algorithm controls access to the critical section,
             ensuring only one thread executes the critical section at a time.
+
+                Phase 1: Each thread first increments the room1 counter and then waits for the t1 semaphore.
+                This allows the thread to synchronize with other threads.
+                If room1 is zero, this indicates that the thread is the first thread, so the t2 semaphore is released.
+                The other threads release the t1 semaphore and go back to waiting.
+
+                Phase 2: After waiting for semaphore t2, the thread accesses the critical region.
+                After the critical zone operation, the thread decrements the room2 counter and if room2 is zero,
+                it allows other threads to wait for the t1 semaphore.
+                Otherwise, the t2 semaphore is released and other threads access the critical region.
+
+            - CODE OUTPUT !!
+            1. Phase - Room Management and Access Control:
+                The first phase of the code ensures that each thread gets a fair turn before entering the
+                critical area. In this phase, a thread indicates that it is in the waiting room by incrementing
+                the counter named “room1” by one. Then, the thread waits to obtain the t1 semaphore.
+                The semaphore determines the first thread that can enter the critical region.
+
+                If room1 is zero (i.e. there are no other waiting threads), this thread releases semaphore t2
+                and can enter the critical region. Other threads release semaphore t1 and wait for their
+                turn to enter the critical region.
+
+            2. Phase - Critical Zone Access and Exit:
+                In the second phase, the thread waits for the t2 semaphore before entering the critical
+                region. After accessing the critical region, the thread decrements the “room2” counter
+                value by one and executes its operations in the critical region.
+
+                When exiting the critical zone, if room2 has reached zero (i.e. there are no other threads
+                waiting), it releases semaphore t1 and allows other threads to wait in phase one.
+                Otherwise, it releases the t2 semaphore, allowing other threads to access the critical
+                region.
          */
 
         std::mutex mutex;
@@ -466,15 +532,22 @@ namespace classical_synchronization_problems
         #define IS_TANENBAUMS 0
 
         /*
-         - IT HAS JUST SOLUTION 1 -
-
          - CONSTRAINTS !!
             • Only one philosopher can hold a fork at a time.
             • It must be impossible for a deadlock to occur.
             • It must be impossible for a philosopher to starve waiting for a fork.
             • It must be possible for more than one philosopher to eat at the same time.
+         - 2 SOLUTIONS !!
+            Regular Solution
+                This solution uses a footman, a “servant” or control mechanism. The footman counter initially has a value of 4,
+                which means that a maximum of 4 philosophers can be at the table at the same time. This prevents 5 philosophers
+                from requesting cutlery at the same time, which eliminates the possibility of deadlock.
+            Tanenbaums Solution
+                In Tanenbaum's solution, philosophers exist in three states: thinking, hungry, hungry, eating.
+                The functions get_forks and put_forks allow each philosopher to eat or wait based on its state (EState).
+                The test function checks whether each philosopher is allowed to eat based on the state of other philosophers around it. If the neighbors are not eating, the philosopher starts eating.
+                This solution avoids deadlock, but starvation may not be completely resolved.
          */
-
 
         struct fork
         {
@@ -516,11 +589,20 @@ namespace classical_synchronization_problems
             std::array<fork, philosophersAmount> tanenbaums_forks {fork(0), fork(0), fork(0), fork(0), fork(0)};
             std::mutex mutex;
 
+            /*
+                This function checks the conditions under which a philosopher can eat
+                and, if appropriate, allows that philosopher to pick up a fork and eat.
+                This ensures synchronization and prevents philosophers from entering
+                deadlock or starvation states.
+             */
             void test(int _index)
             {
+                // If this philosopher's condition is hungry and
+                // If the philosopher to your left (left) and right (right) are not eating:
                 if (states[_index] == EState::hungry && states[left(_index)] != EState::eating && states[right(_index)] != EState::eating)
                 {
                     states[_index] = EState::eating;
+                    // This philosopher is allowed to eat (forks semaphore released)
                     tanenbaums_forks[_index].sem.release();
                 }
             }
@@ -543,8 +625,6 @@ namespace classical_synchronization_problems
             }
         }
 #endif
-
-
 
         void think() { std::cout << std::this_thread::get_id() << " is thinking..." << std::endl; }
         void eat()   { std::cout << std::this_thread::get_id() << " is eating... yummy yummy..." << std::endl; }
@@ -608,14 +688,34 @@ namespace classical_synchronization_problems
         // THIS EXAMPLE FOCUSES ON INTERESTING VERSION IN "LittleBookOfSemaphores" !!
 
         /*
-            PROBLEM OF THE SOLUTION - BOOK EXPLANATION
+            There are three types of agents and three types of smokers in the code.
+            Each agent puts two specific ingredients on the table. Each smoker is
+            next in line to roll and smoke a cigarette after taking the two
+            components he does not have. For example, if a smoker has paper, the
+            other two components, tobacco and matches, must be on the table.
 
+            - DEADLOCK !!
             At the beginning , This example has the possibility of deadlock.
             Imagine that the agent puts out tobacco and paper. Since the smoker with matches is waiting on tobacco,
             it might be unblocked. But the smoker with tobacco is waiting on paper,
             so it is possible (even likely) that it will also be unblocked.
             Then the first thread will block on paper and the second will block on match. Deadlock!
 
+            Deadlock Example:
+             Agent A puts “tobacco” and “paper” on the table. In this situation:
+                * The smoker with “matches” (Smoker 3) wakes up because he is waiting for “tobacco” and “paper”.
+                * At the same time, the smoker with “tobacco” (Smoker 2) wakes up expecting “paper”.
+            However, both “tobacco” and “paper” smokers are waiting for “matches”, so both are blocked:
+                * Smoker 2 waits for “match”.
+                * Smoker 3 waits for “paper”.
+            In this case, both smokers wait forever (deadlock occurs).
+
+        - CODE OUTPUT !!
+            Agent A put tobacco, paper
+            Smoker took tobacco and paper then smoking...
+            Agent A put tobacco, paper
+            ...
+            ...
          */
 
         constexpr uint8_t agentsAmount = 3;
@@ -626,38 +726,50 @@ namespace classical_synchronization_problems
         std::binary_semaphore paper(0);
         std::binary_semaphore match(0);
 
-        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2, std::string& agent_code, std::string& put_on_table1, std::string& put_on_table2)
         {
             while (1)
             {
                 agentSem.acquire();
+                std::cout << "Agent " << agent_code << " put " << put_on_table1 << ", " << put_on_table2 << std::endl;
                 _ingredients1.release();
                 _ingredients2.release();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
-        void execute_smokers(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        void execute_smokers(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2, std::string& take_on_table1, std::string& take_on_table2)
         {
             while (1)
             {
                 _ingredients1.acquire();
                 _ingredients2.acquire();
+                std::cout << "Smoker took " << take_on_table1 << " and " << take_on_table2 << " then smoking...\n";
                 agentSem.release();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
         void run()
         {
+            std::string agent_code_A = "A";
+            std::string agent_code_B = "B";
+            std::string agent_code_C = "C";
+
+            std::string match_staff = "match";
+            std::string tobacco_staff = "tobacco";
+            std::string paper_staff = "paper";
+
             std::array<std::thread, agentsAmount> agents = {
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
-                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper), std::ref(agent_code_A), std::ref(tobacco_staff), std::ref(paper_staff)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match), std::ref(agent_code_B), std::ref(paper_staff), std::ref(match_staff)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match), std::ref(agent_code_C), std::ref(tobacco_staff), std::ref(match_staff))  // Agent C
             };
 
             std::array<std::thread, smokersAmount> smokers = {
-                    std::thread(execute_smokers, std::ref(tobacco), std::ref(paper)), // Smoker with matches
-                    std::thread(execute_smokers, std::ref(paper), std::ref(match)), // Smoker with tobacco
-                    std::thread(execute_smokers, std::ref(tobacco), std::ref(match))  // Smoker with paper
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(paper), std::ref(tobacco_staff), std::ref(paper_staff)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(paper), std::ref(match), std::ref(paper_staff), std::ref(match_staff)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(match), std::ref(tobacco_staff), std::ref(match_staff))  // Smoker with paper
             };
 
             for (auto& agent : agents)   { if (agent.joinable())  { agent.join();  } }
@@ -667,6 +779,59 @@ namespace classical_synchronization_problems
 
     namespace cigarette_smokers_parnas_solution
     {
+        /*
+        - Definition of the Parnas !!
+        The Parnas solution is a synchronization solution for the Cigarette Smokers Problem.
+        Using semaphores and a critical region, it coordinates the interactions of multiple agents
+        (the material setter) and smokers (the smoker who uses the materials to smoke a cigarette).
+        The logic of the solution is to synchronize between the agents who put the ingredients on the table and the smokers who pick them up and smoke.
+
+        - The Logic of the Parnas !!
+        The main goal of the Parnas solution is synchronization and deadlock prevention.
+        Agents put materials on the table and smokers take these materials and smoke.
+        Synchronization aims to properly coordinate an agent's placing of ingredients and a smoker's taking of those ingredients.
+        It also has the goal of deadlock prevention, i.e. keeping agents and smokers working in synchronization and preventing deadlocks.
+
+        - Steps of Parnas !!
+        Agents: Each agent places a certain pair of materials (tobacco, paper, spades) on the table.
+            For example, an agent can put tobacco and paper. The agent uses the agentSem semaphore to put ingredients on the table.
+            This semaphore controls the process of agents putting ingredients on the table.
+            Once the materials are placed on the table, the semaphores are released for the appropriate smoker to take the materials.
+
+        Smokers: Each smoker smokes cigarettes with specific materials. The smokers wait for the respective semaphores
+            to take the materials waiting on the table. The smoker acquires the two semaphores (_ingredients1 and _ingredients2)
+            needed to get the required ingredients and make a cigarette. After acquiring the ingredients,
+            the smoker releases the agentSem semaphore for the agents to place the next ingredient.
+
+        Pushers: Pushers are the functions responsible for putting ingredients on the table.
+            They receive semaphore signals from agents and update the materials accordingly.
+            The Pusher checks what supplies are on the table and replenishes missing supplies.
+
+        Critical Zone and Synchronization: by using mutex, multiple pushers are prevented from changing the table at the same time and
+            data competitions are avoided. By using semaphores (agentSem, tobacco, paper, match), material placement and retrieval are synchronized.
+
+        - Advantages of the Parnas Solution !!
+        Deadlock Prevention: By using semaphores and mutex, it ensures that the whole system works properly and prevents deadlocks.
+            This increases the reliability of the system.
+
+        Ensuring Synchronization: It properly coordinates the interactions between agents and smokers so that all processes run in a synchronized manner.
+
+        Simple and Effective: The solution provides a simple and effective synchronization using semaphores and critical regions.
+            This both makes the code easier to understand and improves performance.
+
+        - CODE OUTPUT !!
+            Agent A put tobacco, paper
+            Smoker took paper and match then made cigarette...
+            Smoking...
+            Agent B put paper, match
+            Smoker took tobacco and paper then made cigarette...
+            Smoking...
+            Agent C put tobacco, matchSmoker took tobacco and match then made cigarette...
+            Smoking...
+            ...
+            ...
+         */
+
         // To solve deadlock
         // The boolean variables indicate whether or not an ingredient is on the table
         std::atomic<bool> isTobacco{false};
@@ -707,42 +872,54 @@ namespace classical_synchronization_problems
                 }
 
                 mutex.unlock();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
-        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2, std::string& agent_code, std::string& staff_on_table1, std::string& staff_on_table2)
         {
             while(true)
             {
                 agentSem.acquire();
+                std::cout << "Agent " << agent_code << " put " << staff_on_table1 << ", " << staff_on_table2 << std::endl;
                 _ingredients1.release();
                 _ingredients2.release();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
-        void execute_smokers(std::binary_semaphore& _mainIngredients)
+        void execute_smokers(std::binary_semaphore& _mainIngredients, std::string& staff_on_table1, std::string& staff_on_table2)
         {
             while(true)
             {
                 _mainIngredients.acquire();
-                // Make Cigaratte - no need to implement
+                std::cout << "Smoker took " << staff_on_table1 << " and " << staff_on_table2 << " then made cigarette...\n";
                 agentSem.release();
-                // Smoke - no need to implement
+                std::cout << "Smoking...\n";
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
         void run()
         {
+            std::string agent_code_A = "A";
+            std::string agent_code_B = "B";
+            std::string agent_code_C = "C";
+
+            std::string match_staff = "match";
+            std::string tobacco_staff = "tobacco";
+            std::string paper_staff = "paper";
+
             std::array<std::thread, agentsAmount> agents = {
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
-                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper), std::ref(agent_code_A), std::ref(tobacco_staff), std::ref(paper_staff)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match), std::ref(agent_code_B), std::ref(paper_staff), std::ref(match_staff)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match), std::ref(agent_code_C), std::ref(tobacco_staff), std::ref(match_staff))  // Agent C
             };
 
             std::array<std::thread, smokersAmount> smokers = {
-                    std::thread(execute_smokers, std::ref(match)), // Smoker with matches
-                    std::thread(execute_smokers, std::ref(tobacco)), // Smoker with tobacco
-                    std::thread(execute_smokers, std::ref(paper))  // Smoker with paper
+                    std::thread(execute_smokers, std::ref(match), std::ref(tobacco_staff), std::ref(paper_staff)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(paper_staff), std::ref(match_staff)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(paper), std::ref(tobacco_staff), std::ref(match_staff))  // Smoker with paper
             };
 
             std::array<std::thread, agentsAmount> pushers = {
@@ -799,42 +976,54 @@ namespace classical_synchronization_problems
                 }
 
                 mutex.unlock();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
-        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2)
+        void execute_agent(std::binary_semaphore& _ingredients1, std::binary_semaphore& _ingredients2, std::string& agent_code, std::string& staff_on_table1, std::string& staff_on_table2)
         {
             while(true)
             {
                 agentSem.acquire();
+                std::cout << "Agent " << agent_code << " put " << staff_on_table1 << ", " << staff_on_table2 << std::endl;
                 _ingredients1.release();
                 _ingredients2.release();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
-        void execute_smokers(std::binary_semaphore& _mainIngredients)
+        void execute_smokers(std::binary_semaphore& _mainIngredients, std::string& staff_on_table1, std::string& staff_on_table2)
         {
             while(true)
             {
                 _mainIngredients.acquire();
-                // Make Cigaratte - no need to implement
+                std::cout << "Smoker took " << staff_on_table1 << " and " << staff_on_table2 << " then made cigarette...\n";
                 agentSem.release();
-                // Smoke - no need to implement
+                std::cout << "Smoking...\n";
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
 
         void run()
         {
+            std::string agent_code_A = "A";
+            std::string agent_code_B = "B";
+            std::string agent_code_C = "C";
+
+            std::string match_staff = "match";
+            std::string tobacco_staff = "tobacco";
+            std::string paper_staff = "paper";
+
             std::array<std::thread, agentsAmount> agents = {
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper)), // Agent A
-                    std::thread(execute_agent, std::ref(paper), std::ref(match)), // Agent B
-                    std::thread(execute_agent, std::ref(tobacco), std::ref(match))  // Agent C
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(paper), std::ref(agent_code_A), std::ref(tobacco_staff), std::ref(paper_staff)), // Agent A
+                    std::thread(execute_agent, std::ref(paper), std::ref(match), std::ref(agent_code_B), std::ref(paper_staff), std::ref(match_staff)), // Agent B
+                    std::thread(execute_agent, std::ref(tobacco), std::ref(match), std::ref(agent_code_C), std::ref(tobacco_staff), std::ref(match_staff))  // Agent C
             };
 
             std::array<std::thread, smokersAmount> smokers = {
-                    std::thread(execute_smokers, std::ref(match)), // Smoker with matches
-                    std::thread(execute_smokers, std::ref(tobacco)), // Smoker with tobacco
-                    std::thread(execute_smokers, std::ref(paper))  // Smoker with paper
+                    std::thread(execute_smokers, std::ref(match), std::ref(tobacco_staff), std::ref(paper_staff)), // Smoker with matches
+                    std::thread(execute_smokers, std::ref(tobacco), std::ref(paper_staff), std::ref(match_staff)), // Smoker with tobacco
+                    std::thread(execute_smokers, std::ref(paper), std::ref(tobacco_staff), std::ref(match_staff))  // Smoker with paper
             };
 
             std::array<std::thread, agentsAmount> pushers = {
