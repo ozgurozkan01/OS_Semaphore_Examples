@@ -651,36 +651,13 @@ namespace less_classical_synchronization_problems
             std::vector<std::thread> reindeers;
             std::thread santa(execute_santa);
 
-            for (int i = 0; i < elves_number; ++i)
-            {
-                elves.push_back(std::thread(execute_elf));
-            }
+            for (int i = 0; i < elves_number; ++i) { elves.push_back(std::thread(execute_elf)); }
+            for (int i = 0; i < reindeer_number; ++i) { reindeers.push_back(std::thread(execute_reindeer)); }
 
-            for (int i = 0; i < reindeer_number; ++i)
-            {
-                reindeers.push_back(std::thread(execute_reindeer));
-            }
+            if (santa.joinable()) { santa.join(); }
 
-            if (santa.joinable())
-            {
-                santa.join();
-            }
-
-            for (auto& elf : elves)
-            {
-                if (elf.joinable())
-                {
-                    elf.join();
-                }
-            }
-
-            for (auto& reinder : reindeers)
-            {
-                if (reinder.joinable())
-                {
-                    reinder.join();
-                }
-            }
+            for (auto& elf : elves) { if (elf.joinable()) { elf.join(); } }
+            for (auto& reinder : reindeers) { if (reinder.joinable()) { reinder.join(); } }
         }
     }
 
@@ -775,23 +752,10 @@ namespace less_classical_synchronization_problems
         {
             std::vector<std::thread> threads;
 
-            for (int i = 0; i < 10; ++i)
-            {
-                threads.push_back(std::thread(execute_hydrogen));
-            }
+            for (int i = 0; i < 10; ++i) { threads.push_back(std::thread(execute_hydrogen)); }
+            for (int i = 0; i < 5; ++i) { threads.push_back(std::thread(execute_oxygen)); }
 
-            for (int i = 0; i < 5; ++i)
-            {
-                threads.push_back(std::thread(execute_oxygen));
-            }
-
-            for (auto& thread : threads)
-            {
-                if (thread.joinable())
-                {
-                    thread.join();
-                }
-            }
+            for (auto& thread : threads) { if (thread.joinable()) { thread.join(); } }
         }
     }
 
@@ -903,26 +867,6 @@ namespace less_classical_synchronization_problems
                 }
             }
         }
-    }
-
-    namespace the_roller_coaster_problem
-    {
-        /*
-         - LOGIC OF RUNNING !!
-            Suppose there are n passenger threads and a car thread. The
-            passengers repeatedly wait to take rides in the car, which can hold
-            C passengers, where C < n. The car can go around the tracks only
-            when it is full.
-
-            • Passengers should invoke board and unboard.
-            • The car should invoke load, run and unload.
-            • Passengers cannot board until the car has invoked load
-            • The car cannot depart until C passengers have boarded.
-            • Passengers cannot unboard until the car has invoked unload.
-
-         - CODE OUTPUT !!
-
-         */
     }
 }
 

@@ -10,7 +10,7 @@
 #include <thread>
 #include <array>
 #include <list>
-#include "../single_linked_list.h"
+#include "single_linked_list.h"
 
 namespace not_so_classical_problems
 {

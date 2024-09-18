@@ -72,7 +72,7 @@ namespace not_remotely_classical_problems
         int eating_counter = 0; // keep track of the number of threads sitting at the bar
         int waiting_counter = 0; // keep track of the number of threads waiting
         std::mutex mutex; // mutex protects both counters
-        std::counting_semaphore<5> block(0); // som incoming customers have to block on block.
+        std::counting_semaphore<5> block(0); // some incoming customers have to block on block.
         bool must_wait = false; // must wait indicates that the bar is (or has been) full
 
         void execute()
@@ -406,7 +406,6 @@ namespace not_remotely_classical_problems
                     // search()
                     std::cout << "Dean is searching the room...\n";
                     std::cout << "Dean got out the room...\n";
-                    exit(-1);
                 }
 
                 dean_state = not_here;
@@ -506,8 +505,8 @@ namespace not_remotely_classical_problems
                 The goal is to enable one thread to efficiently delegate a resource or lock to another thread.
 
             - PATTERN PURPOSE
-            The purpose of this pattern is to minimize the use of synchronization tools such as locks (mutex or semaphore)
-            by delegating control or resources between threads. This avoids unnecessary holding of locks and reduces waiting times.
+                The purpose of this pattern is to minimize the use of synchronization tools such as locks (mutex or semaphore)
+                by delegating control or resources between threads. This avoids unnecessary holding of locks and reduces waiting times.
          */
 
         constexpr int max_rider_count_per_bus = 50;
@@ -609,10 +608,6 @@ namespace not_remotely_classical_problems
             - PATTERN PURPOSE !!
                 The main purpose of this pattern is that a thread that completes a certain part of a job will take over the rest of the
                 work that other threads need to do. This pattern can speed up the job completion process and avoid unnecessary synchronization waits.
-
-            - CHALLENGE !!
-                if riders arrive while the bus is boarding, they might be annoyed if you make them wait for the next one.
-                Can you find a solution that allows late arrivals to board without violating the other constraints?
          */
 
         constexpr int max_rider_count_per_bus = 50;
@@ -649,7 +644,7 @@ namespace not_remotely_classical_problems
                 mutex.unlock();
 
                 // depart()
-                std::cout << "depart" << std::endl;
+                std::cout << "Bus is departing...\n";
             }
         }
 
@@ -663,7 +658,7 @@ namespace not_remotely_classical_problems
 
                 bus.acquire();
                 // board()
-                std::cout << "board" << std::endl;
+                std::cout << "Boarding the bus...\n";
                 boarded.release();
             }
         }
@@ -679,11 +674,6 @@ namespace not_remotely_classical_problems
             for (auto& t : bus_threads) { if (t.joinable()) { t.join(); } }
             for (auto& t : rider_threads) { if (t.joinable()) { t.join(); } }
         }
-    }
-
-    namespace senate_bus_problem_challenge_solution
-    {
-        // NOT IMPLEMENTED YET
     }
 
     namespace faneuil_hall_problem
@@ -833,11 +823,183 @@ namespace not_remotely_classical_problems
 
     namespace faneuil_hall_problem_puzzle_solution
     {
+        /*
+            - PROBLEM DEFINITION !!
+                “There are three kinds of threads: immigrants, spectators, and a one judge.
+                Immigrants must wait in line, check in, and then sit down. At some point, the
+                judge enters the building. When the judge is in the building, no one may enter,
+                and the immigrants may not leave. Spectators may leave. Once all immigrants
+                check in, the judge can confirm the naturalization. After the confirmation, the
+                immigrants pick up their certificates of U.S. Citizenship. The judge leaves at
+                some point after the confirmation. Spectators may now enter as before. After
+                immigrants get their certificates, they may leave.”
 
+            - CONSTRAINTS !!
+                • Immigrants must invoke enter, checkIn, sitDown, swear,
+                    getCertificate and leave.
+                • The judge invokes enter, confirm and leave.
+                • Spectators invoke enter, spectate and leave.
+                • While the judge is in the building, no one may enter and immigrants may
+                    not leave.
+                • The judge can not confirm until all immigrants who have invoked enter
+                    have also invoked checkIn.
+                • Immigrants can not getCertificate until the judge has executed
+                    confirm
+
+            - SOLUTION WAY !!
+                To solve the puzzle, we need to ensure that after the judge leaves, all the immigrants
+                who have been sworn in must leave before the judge can enter again. This requires us
+                to track the number of immigrants who have sworn in but not yet left.
+                The judge cannot re-enter until all such immigrants have exited.
+
+                We can achieve this by introducing an additional counter that keeps track of how many immigrants are still in the building.
+                The judge will wait until this counter reaches zero before being allowed to enter again.
+         */
+
+        constexpr int immigrant_count = 5;
+        constexpr int spectator_count = 3;
+
+        std::mutex no_judge; // noJudge acts as a turnstile for incoming immigrants and spectators;
+        int entered_immigrant = 0; // counts the number of immigrants in the room
+        int checked_immigrant = 0; // counts the number of immigrants who have checked in
+        int remaining_immigrants = 0; // counts the number of immigrants who haven't left after being sworn in
+        std::mutex mutex; // protects counters
+        std::counting_semaphore<immigrant_count> confirmed(0); // signals that the judge has executed confirm.
+        std::binary_semaphore all_signed_in(0);
+        std::binary_semaphore all_immigrants_left(1); // signals that all immigrants have left
+        bool is_judge = false;
+
+        void execute_immigrant()
+        {
+            // Immigrants cannot enter while the judge is in the building
+            no_judge.lock();
+            std::cout << "Immigrant entered the room...\n"; // enter()
+            entered_immigrant++;
+            remaining_immigrants++; // Increment remaining immigrants in the building
+            no_judge.unlock();
+
+            mutex.lock();
+            std::cout << "Immigrant checked in...\n"; // checkIn()
+            checked_immigrant++;
+
+            if (is_judge && entered_immigrant == checked_immigrant)
+            {
+                all_signed_in.release();
+            }
+            else
+            {
+                mutex.unlock();
+            }
+
+            std::cout << "Immigrant had a seat...\n"; // sitDown()
+            confirmed.acquire();
+            std::cout << "Immigrant swore...\n"; // swear()
+            std::cout << "Immigrant got certificate...\n"; // getCertificate()
+
+            no_judge.lock();
+            std::cout << "Immigrant is leaving...\n"; // leave()
+            remaining_immigrants--; // Decrement remaining immigrants
+            if (remaining_immigrants == 0)
+            {
+                // If no immigrants are left, signal that the building is clear
+                all_immigrants_left.release();
+            }
+            no_judge.unlock();
+        }
+
+        void execute_judge()
+        {
+            // The judge must wait for all sworn-in immigrants to leave before entering
+            all_immigrants_left.acquire();
+
+            no_judge.lock();
+            mutex.lock();
+
+            std::cout << "Judge entered the room...\n"; // enter()
+            is_judge = true;
+
+            if (entered_immigrant > checked_immigrant)
+            {
+                mutex.unlock();
+                all_signed_in.acquire();
+            }
+
+            std::cout << "Judge confirmed all checked...\n"; // confirm()
+            confirmed.release(checked_immigrant);
+            entered_immigrant = 0;
+            checked_immigrant = 0;
+
+            std::cout << "Judge is leaving the room...\n"; // leave()
+            is_judge = false;
+            mutex.unlock();
+            no_judge.unlock();
+
+            // The judge cannot re-enter until all immigrants have left
+            all_immigrants_left.release();
+        }
+
+        void execute_spectator()
+        {
+            no_judge.lock();
+            std::cout << "Spectator entered the room...\n"; // enter()
+            no_judge.unlock();
+
+            std::cout << "Spectator is spectating...\n"; // spectate()
+            std::cout << "Spectator is leaving...\n"; // leave()
+        }
+
+        void run()
+        {
+            std::vector<std::thread> threads;
+
+            for (int i = 0; i < immigrant_count; ++i)
+            {
+                threads.emplace_back(execute_immigrant);
+            }
+            threads.emplace_back(execute_judge);
+            for (int i = 0; i < spectator_count; ++i)
+            {
+                threads.emplace_back(execute_spectator);
+            }
+
+            for (auto &t : threads)
+            {
+                if (t.joinable())
+                {
+                    t.join();
+                }
+            }
+        }
     }
+
 
     namespace extended_faneuil_hall_problem
     {
+        /*
+            - PROBLEM DEFINITION !!
+                “There are three kinds of threads: immigrants, spectators, and a one judge.
+                Immigrants must wait in line, check in, and then sit down. At some point, the
+                judge enters the building. When the judge is in the building, no one may enter,
+                and the immigrants may not leave. Spectators may leave. Once all immigrants
+                check in, the judge can confirm the naturalization. After the confirmation, the
+                immigrants pick up their certificates of U.S. Citizenship. The judge leaves at
+                some point after the confirmation. Spectators may now enter as before. After
+                immigrants get their certificates, they may leave.”
+
+            - CONSTRAINTS !!
+                • Immigrants must invoke enter, checkIn, sitDown, swear,
+                    getCertificate and leave.
+                • The judge invokes enter, confirm and leave.
+                • Spectators invoke enter, spectate and leave.
+                • While the judge is in the building, no one may enter and immigrants may
+                    not leave.
+                • The judge can not confirm until all immigrants who have invoked enter
+                    have also invoked checkIn.
+                • Immigrants can not getCertificate until the judge has executed
+                    confirm
+         */
+
+
         constexpr int immigrant_count = 5;
         constexpr int spectator_count = 3;
 
@@ -863,6 +1025,7 @@ namespace not_remotely_classical_problems
                 This pass-back is not strictly necessary, but it has the nice feature that the judge releases both mutex
                 and noJudge to end the phase cleanly
              */
+
             no_judge.lock();
             std::cout << "Immigrant entered the room...\n"; // enter()
             entered_immigrant++;
@@ -901,6 +1064,12 @@ namespace not_remotely_classical_problems
         }
         void execute_judge()
         {
+            /*
+                The judge prevents any new entries while in the room by locking no_judge.
+                The judge then locks mutex to check in the immigrants and wait until all are checked in.
+                After confirming all checked-in immigrants, the judge signals them and resets counters.
+                Finally, the judge releases the mutex and no_judge, allowing others to enter.
+            */
             no_judge.lock();
             mutex.lock();
 
@@ -927,6 +1096,10 @@ namespace not_remotely_classical_problems
         }
         void execute_spectator()
         {
+            /*
+                Spectators enter the room without any restrictions and leave freely.
+                They simply need to pass through the no_judge turnstile to enter and exit.
+            */
             no_judge.lock();
             std::cout << "Spectator entered the room...\n"; // enter()
             no_judge.unlock();
@@ -1061,6 +1234,88 @@ namespace not_remotely_classical_problems
                 student allows both students to proceed. It either case, we don’t have to check
                 for students waiting to leave, since no one can leave an empty table!
          */
+
+        constexpr int student_count = 7;
+
+        int ready_to_eat = 0;
+        int eating = 0;
+        int ready_to_leave = 0;
+
+        std::binary_semaphore ok_to_sit(0);
+        std::binary_semaphore ok_to_leave(0);
+        std::mutex mutex;
+
+        void execute_student(const int& student_code)
+        {
+            std::cout << student_code << ". student is getting food...\n";
+
+            mutex.lock();
+            ready_to_eat++;
+
+            if (eating == 0 && ready_to_eat == 1)
+            {
+                // If first student, they wait for another to join
+                mutex.unlock();
+                ok_to_sit.acquire();
+            }
+            else if (eating == 0 && ready_to_eat == 2)
+            {
+                // If second student, both can sit down to eat
+                ok_to_sit.release();
+                ready_to_eat -= 2;
+                eating += 2;
+                mutex.unlock();
+            }
+            else
+            {
+                ready_to_eat--;
+                eating++;
+                if (eating == 2 && ready_to_leave == 1)
+                {
+                    // Signal a waiting student to leave if applicable
+                    ok_to_leave.release();
+                    ready_to_leave--;
+                }
+                mutex.unlock();
+            }
+
+            std::cout << student_code << ". student is dining...\n";
+
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            mutex.lock();
+            eating--;
+            ready_to_leave++;
+
+            if (eating == 1 && ready_to_leave == 1)
+            {
+                // If there's one student eating and one ready to leave, the latter waits
+                mutex.unlock();
+                ok_to_leave.acquire();
+            }
+            else if (eating == 0 && ready_to_leave == 2)
+            {
+                // If two are ready to leave and no one is eating, both can leave
+                ok_to_leave.release();
+                ready_to_leave -= 2;
+                mutex.unlock();
+            }
+            else
+            {
+                ready_to_leave--;
+                mutex.unlock();
+            }
+
+            std::cout << student_code << ". student is leaving...\n";
+        }
+
+        void run()
+        {
+            std::array<std::thread, student_count> students;
+
+            for (int i = 0; i < student_count; ++i) { students[i] = std::thread(execute_student, i); }
+            for (int i = 0; i < student_count; ++i) { if (students[i].joinable()) { students[i].join(); } }
+        }
     }
 }
 
